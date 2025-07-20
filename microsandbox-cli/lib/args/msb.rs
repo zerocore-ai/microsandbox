@@ -514,7 +514,7 @@ pub enum MicrosandboxSubcommand {
         file: Option<PathBuf>,
 
         /// Force clean
-        #[arg(long)]
+        #[arg(short = 'F', long)]
         force: bool,
     },
 

@@ -459,8 +459,8 @@ async fn copy_file_with_permissions(
 /// Sets the user.containers.override_stat xattr on the rootfs directory.
 ///
 /// This function:
-/// 1. Sets the extended attribute user.containers.override_stat to "0:0:0555"
-/// 2. This overrides the UID:GID:MODE of the rootfs directory when accessed inside the container
+/// 1. Sets the extended attribute user.containers.override_stat to "0:0:040755"
+/// 2. This overrides the UID:GID:MODE of the rootfs directory when accessed inside the VM
 ///
 /// ## Arguments
 /// * `root_path` - Path to the rootfs directory to modify
@@ -472,8 +472,9 @@ pub async fn patch_with_stat_override(root_path: &Path) -> MicrosandboxResult<()
     // The xattr name to set
     let xattr_name = "user.containers.override_stat";
 
-    // The value in the format "uid:gid:mode" (0:0:0555 means root:root with r-xr-xr-x permissions)
-    let xattr_value = "0:0:0555";
+    // The value in the format "uid:gid:mode" (0:0:040755 means root:root directory with rwxr-xr-x permissions)
+    // 040000 is S_IFDIR (directory file type), 0755 are the permissions
+    let xattr_value = "0:0:040755";
 
     // Convert path to CString for xattr crate
     let path_str = root_path.to_str().ok_or_else(|| {
@@ -1044,7 +1045,7 @@ mod tests {
 
         // Check if xattr was set and has the correct value
         assert!(xattr_value.is_some(), "xattr was not set");
-        assert_eq!(xattr_value.unwrap(), b"0:0:0555", "xattr value incorrect");
+        assert_eq!(xattr_value.unwrap(), b"0:0:040555", "xattr value incorrect");
 
         Ok(())
     }
