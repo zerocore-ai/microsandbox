@@ -33,12 +33,6 @@ pub struct Sandbox {
     /// The paths to the root filesystems for the sandbox.
     pub rootfs_paths: String,
 
-    /// The ID of the group that the sandbox belongs to.
-    pub group_id: Option<u32>,
-
-    /// The IP address of the group that the sandbox belongs to.
-    pub group_ip: Option<String>,
-
     /// When the sandbox was created
     pub created_at: DateTime<Utc>,
 

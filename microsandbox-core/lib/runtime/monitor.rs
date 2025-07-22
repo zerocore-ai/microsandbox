@@ -158,8 +158,6 @@ impl ProcessMonitor for MicroVmMonitor {
             self.supervisor_pid,
             microvm_pid,
             &rootfs_paths,
-            None,
-            None,
         )
         .await
         .map_err(MicrosandboxUtilsError::custom)?;

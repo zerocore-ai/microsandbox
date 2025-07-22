@@ -115,8 +115,6 @@ pub(crate) async fn save_or_update_sandbox(
     supervisor_pid: u32,
     microvm_pid: u32,
     rootfs_paths: &str,
-    group_id: Option<u32>,
-    group_ip: Option<String>,
 ) -> MicrosandboxResult<i64> {
     let sandbox = Sandbox {
         id: 0,
@@ -127,8 +125,6 @@ pub(crate) async fn save_or_update_sandbox(
         supervisor_pid,
         microvm_pid,
         rootfs_paths: rootfs_paths.to_string(),
-        group_id,
-        group_ip,
         created_at: Utc::now(),
         modified_at: Utc::now(),
     };
@@ -142,8 +138,6 @@ pub(crate) async fn save_or_update_sandbox(
             supervisor_pid = ?,
             microvm_pid = ?,
             rootfs_paths = ?,
-            group_id = ?,
-            group_ip = ?,
             modified_at = CURRENT_TIMESTAMP
         WHERE name = ? AND config_file = ?
         RETURNING id
@@ -154,8 +148,6 @@ pub(crate) async fn save_or_update_sandbox(
     .bind(&sandbox.supervisor_pid)
     .bind(&sandbox.microvm_pid)
     .bind(&sandbox.rootfs_paths)
-    .bind(&sandbox.group_id)
-    .bind(&sandbox.group_ip)
     .bind(&sandbox.name)
     .bind(&sandbox.config_file)
     .fetch_optional(pool)
@@ -171,10 +163,9 @@ pub(crate) async fn save_or_update_sandbox(
             r#"
             INSERT INTO sandboxes (
                 name, config_file, config_last_modified,
-                status, supervisor_pid, microvm_pid, rootfs_paths,
-                group_id, group_ip
+                status, supervisor_pid, microvm_pid, rootfs_paths
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             RETURNING id
             "#,
         )
@@ -185,8 +176,6 @@ pub(crate) async fn save_or_update_sandbox(
         .bind(sandbox.supervisor_pid)
         .bind(sandbox.microvm_pid)
         .bind(sandbox.rootfs_paths)
-        .bind(sandbox.group_id)
-        .bind(sandbox.group_ip)
         .fetch_one(pool)
         .await?;
 
@@ -203,7 +192,7 @@ pub(crate) async fn get_sandbox(
         r#"
         SELECT id, name, config_file, config_last_modified, status,
                supervisor_pid, microvm_pid, rootfs_paths,
-               group_id, group_ip, created_at, modified_at
+               created_at, modified_at
         FROM sandboxes
         WHERE name = ? AND config_file = ?
         "#,
@@ -225,8 +214,6 @@ pub(crate) async fn get_sandbox(
         supervisor_pid: row.get("supervisor_pid"),
         microvm_pid: row.get("microvm_pid"),
         rootfs_paths: row.get("rootfs_paths"),
-        group_id: row.get("group_id"),
-        group_ip: row.get("group_ip"),
         created_at: parse_sqlite_datetime(&row.get::<String, _>("created_at")),
         modified_at: parse_sqlite_datetime(&row.get::<String, _>("modified_at")),
     }))
@@ -265,7 +252,7 @@ pub(crate) async fn get_running_config_sandboxes(
         r#"
         SELECT id, name, config_file, config_last_modified, status,
                supervisor_pid, microvm_pid, rootfs_paths,
-               group_id, group_ip, created_at, modified_at
+               created_at, modified_at
         FROM sandboxes
         WHERE config_file = ? AND status = ?
         ORDER BY created_at DESC
@@ -290,8 +277,6 @@ pub(crate) async fn get_running_config_sandboxes(
             supervisor_pid: row.get("supervisor_pid"),
             microvm_pid: row.get("microvm_pid"),
             rootfs_paths: row.get("rootfs_paths"),
-            group_id: row.get("group_id"),
-            group_ip: row.get("group_ip"),
             created_at: parse_sqlite_datetime(&row.get::<String, _>("created_at")),
             modified_at: parse_sqlite_datetime(&row.get::<String, _>("modified_at")),
         })

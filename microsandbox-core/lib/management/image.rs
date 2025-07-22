@@ -19,9 +19,10 @@ use microsandbox_utils::term::{self, MULTI_PROGRESS};
 use microsandbox_utils::{env, EXTRACTED_LAYER_SUFFIX, LAYERS_SUBDIR, OCI_DB_FILENAME};
 use sqlx::{Pool, Sqlite};
 #[cfg(feature = "cli")]
-use std::io::{Read, Result as IoResult};
+use std::io::Result as IoResult;
 use std::path::{Path, PathBuf};
-#[cfg(feature = "cli")]
+use std::ffi::CStr;
+use std::io::Read;
 use tar::Archive;
 use tempfile::tempdir;
 use tokio::fs;
@@ -99,16 +100,9 @@ const EXTRACT_LAYERS_MSG: &str = "Extracting layers";
 /// ```
 pub async fn pull(
     name: Reference,
-    image: bool,
+    _image: bool,
     layer_path: Option<PathBuf>,
 ) -> MicrosandboxResult<()> {
-    // Image must be true
-    if !image {
-        return Err(MicrosandboxError::InvalidArgument(
-            "image must be true".to_string(),
-        ));
-    }
-
     // Single image pull mode (default if both flags are false, or if image is true)
     let registry = name.to_string().split('/').next().unwrap_or("").to_string();
     let temp_download_dir = tempdir()?.into_path();
@@ -367,10 +361,223 @@ async fn check_image_layers(
     }
 }
 
+/// Helper function to set xattr with stat information
+fn set_stat_xattr(
+    path: &Path,
+    xattr_name: &CStr,
+    uid: u64,
+    gid: u64,
+    mode: u32,
+) -> Result<(), MicrosandboxError> {
+    use std::ffi::CString;
+
+    let stat_data = format!("{}:{}:0{:o}", uid, gid, mode);
+    let path_cstring = CString::new(path.as_os_str().as_encoded_bytes())
+        .map_err(|e| MicrosandboxError::LayerExtraction(format!("Invalid path: {:?}", e)))?;
+
+    let result = unsafe {
+        libc::setxattr(
+            path_cstring.as_ptr(),
+            xattr_name.as_ptr(),
+            stat_data.as_ptr() as *const libc::c_void,
+            stat_data.len(),
+            0,
+        )
+    };
+
+    if result != 0 {
+        let errno = std::io::Error::last_os_error();
+        if errno.raw_os_error() == Some(libc::ENOTSUP) {
+            tracing::warn!(
+                "Filesystem does not support xattrs for {}, continuing without stat shadowing",
+                path.display()
+            );
+        } else {
+            return Err(MicrosandboxError::LayerExtraction(format!(
+                "Failed to set xattr on {}: {}",
+                path.display(),
+                errno
+            )));
+        }
+    }
+    Ok(())
+}
+
 /// Extracts a layer from the downloaded tar.gz file into an extracted directory.
 /// The extracted directory will be named as <layer-name>.extracted
+/// Custom extraction function that modifies file ownership during extraction
+fn extract_tar_with_ownership_override<R: Read>(
+    archive: &mut Archive<R>,
+    extract_dir: &Path,
+) -> MicrosandboxResult<()> {
+    use std::ffi::CString;
+    use std::os::unix::fs::PermissionsExt;
+
+    // Cache the xattr name to avoid repeated allocations
+    let xattr_name = CString::new("user.containers.override_stat")
+        .map_err(|e| MicrosandboxError::LayerExtraction(format!("Invalid attr name: {:?}", e)))?;
+
+    // Structure to store hard link information
+    struct HardLinkInfo {
+        link_path: PathBuf,
+        target_path: PathBuf,
+        uid: u64,
+        gid: u64,
+        mode: u32,
+    }
+
+    // Store hard links to process after all regular files are extracted
+    let mut hard_links = Vec::new();
+
+    for entry in archive.entries()? {
+        let mut entry =
+            entry.map_err(|e| MicrosandboxError::LayerExtraction(format!("{:?}", e)))?;
+        let path = entry
+            .path()
+            .map_err(|e| MicrosandboxError::LayerExtraction(format!("{:?}", e)))?;
+        let full_path = extract_dir.join(&path);
+
+        // Get the original metadata from the tar entry
+        let original_uid = entry.header().uid()?;
+        let original_gid = entry.header().gid()?;
+        let original_mode = entry.header().mode()?;
+
+        // Check the entry type
+        let entry_type = entry.header().entry_type();
+        let is_symlink = entry_type.is_symlink();
+        let is_hard_link = entry_type.is_hard_link();
+
+        // Handle hard links separately - collect them for processing after all files are extracted
+        if is_hard_link {
+            if let Ok(Some(link_name)) = entry.link_name() {
+                hard_links.push(HardLinkInfo {
+                    link_path: full_path.clone(),
+                    target_path: extract_dir.join(&link_name),
+                    uid: original_uid,
+                    gid: original_gid,
+                    mode: original_mode,
+                });
+            }
+            continue; // Skip to next entry
+        }
+
+        // Extract the entry (regular files, directories, symlinks)
+        entry
+            .unpack(&full_path)
+            .map_err(|e| MicrosandboxError::LayerExtraction(format!("{:?}", e)))?;
+
+        // Skip all operations for symlinks
+        if is_symlink {
+            tracing::trace!(
+                "Extracted symlink {} with original uid:gid:mode {}:{}:{:o}",
+                full_path.display(),
+                original_uid,
+                original_gid,
+                original_mode
+            );
+            continue;
+        }
+
+        // For regular files and directories, handle permissions and xattrs
+        let metadata = std::fs::metadata(&full_path)?;
+        let is_dir = metadata.is_dir();
+        let current_mode = metadata.permissions().mode();
+
+        // Calculate the final desired permissions
+        let desired_mode = if is_dir {
+            // For directories, ensure at least u+rwx (0o700)
+            current_mode | 0o700
+        } else {
+            // For files, ensure at least u+rw (0o600)
+            current_mode | 0o600
+        };
+
+        // If we need to modify permissions, do it once
+        if current_mode != desired_mode {
+            let mut permissions = metadata.permissions();
+            permissions.set_mode(desired_mode);
+            std::fs::set_permissions(&full_path, permissions)?;
+        }
+
+        // Store original uid/gid/mode in xattrs
+        set_stat_xattr(&full_path, &xattr_name, original_uid, original_gid, original_mode)?;
+
+        tracing::trace!(
+            "Extracted {} with original uid:gid:mode {}:{}:{:o}, stored in xattr",
+            full_path.display(),
+            original_uid,
+            original_gid,
+            original_mode
+        );
+    }
+
+    // Second pass: process hard links after all regular files are extracted
+    for link_info in hard_links {
+        // Create the hard link
+        match std::fs::hard_link(&link_info.target_path, &link_info.link_path) {
+            Ok(_) => {
+                // Hard link created successfully, now handle xattrs
+                // Get metadata and ensure proper permissions
+                let metadata = match std::fs::metadata(&link_info.link_path) {
+                    Ok(m) => m,
+                    Err(e) => {
+                        tracing::warn!(
+                            "Failed to get metadata for hard link {}: {}",
+                            link_info.link_path.display(),
+                            e
+                        );
+                        continue;
+                    }
+                };
+
+                let current_mode = metadata.permissions().mode();
+                let desired_mode = current_mode | 0o600; // Ensure at least u+rw
+
+                // Set permissions if needed
+                if current_mode != desired_mode {
+                    let mut permissions = metadata.permissions();
+                    permissions.set_mode(desired_mode);
+                    if let Err(e) = std::fs::set_permissions(&link_info.link_path, permissions) {
+                        tracing::warn!(
+                            "Failed to set permissions for hard link {}: {}",
+                            link_info.link_path.display(),
+                            e
+                        );
+                        continue;
+                    }
+                }
+
+                // Store original uid/gid/mode in xattrs
+                if let Err(e) = set_stat_xattr(&link_info.link_path, &xattr_name, link_info.uid, link_info.gid, link_info.mode) {
+                    // For hard links, we just warn on xattr errors instead of failing
+                    tracing::warn!("Failed to set xattr on hard link {}: {}", link_info.link_path.display(), e);
+                }
+
+                tracing::trace!(
+                    "Created hard link {} -> {} with original uid:gid:mode {}:{}:{:o}",
+                    link_info.link_path.display(),
+                    link_info.target_path.display(),
+                    link_info.uid,
+                    link_info.gid,
+                    link_info.mode
+                );
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "Failed to create hard link {} -> {}: {}",
+                    link_info.link_path.display(),
+                    link_info.target_path.display(),
+                    e
+                );
+            }
+        }
+    }
+
+    Ok(())
+}
+
 async fn extract_layer(
-    layer_path: impl AsRef<std::path::Path>,
+    layer_path: impl AsRef<Path>,
     extract_base_dir: impl AsRef<Path>,
 ) -> MicrosandboxResult<()> {
     let layer_path = layer_path.as_ref();
@@ -468,7 +675,7 @@ async fn extract_layer(
             };
             let decoder = GzDecoder::new(reader);
             let mut archive = Archive::new(decoder);
-            archive.unpack(&extract_dir_clone)?;
+            extract_tar_with_ownership_override(&mut archive, &extract_dir_clone)?;
             Ok(())
         })
         .await
@@ -480,7 +687,6 @@ async fn extract_layer(
     #[cfg(not(feature = "cli"))]
     {
         use flate2::read::GzDecoder;
-        use tar::Archive;
 
         let file =
             std::fs::File::open(layer_path).map_err(|e| MicrosandboxError::LayerHandling {
@@ -489,9 +695,7 @@ async fn extract_layer(
             })?;
         let decoder = GzDecoder::new(file);
         let mut archive = Archive::new(decoder);
-        archive
-            .unpack(&extract_dir)
-            .map_err(|e| MicrosandboxError::LayerExtraction(format!("{:?}", e)))?;
+        extract_tar_with_ownership_override(&mut archive, &extract_dir)?;
     }
 
     tracing::info!(
