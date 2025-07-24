@@ -242,7 +242,7 @@ mod tests {
         let test_cases = vec![
             ("./local/path", "./local/path"),
             ("/absolute/path", "/absolute/path"),
-            ("alpine:latest", "sandboxes.io/library/alpine:latest"),
+            ("alpine:latest", "docker.io/library/alpine:latest"),
             (
                 "registry.example.com/app:v1.0",
                 "registry.example.com/library/app:v1.0",

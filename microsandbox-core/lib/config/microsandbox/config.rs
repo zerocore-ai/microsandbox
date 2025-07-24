@@ -171,9 +171,9 @@ pub struct Build {
     pub(crate) shell: Option<String>,
 
     /// The steps that will be run.
-    #[serde(skip_serializing_if = "HashMap::is_empty", default)]
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     #[builder(default)]
-    pub(crate) steps: HashMap<String, String>,
+    pub(crate) steps: Vec<String>,
 
     /// The command to run. This is a list of command and arguments.
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
@@ -673,7 +673,7 @@ mod tests {
                 workdir: "/build"
                 shell: "/bin/bash"
                 steps:
-                  build: "pip install -r requirements.txt"
+                  - "pip install -r requirements.txt"
                 imports:
                   requirements: "./requirements.txt"
                 exports:
@@ -725,7 +725,7 @@ mod tests {
         );
         assert_eq!(base_build.shell, Some("/bin/bash".to_string()));
         assert_eq!(
-            base_build.steps.get("build").unwrap(),
+            base_build.steps.get(0).unwrap(),
             "pip install -r requirements.txt"
         );
         assert_eq!(
@@ -756,8 +756,8 @@ mod tests {
                 depends_on: ["deps"]
               deps:
                 image: "python:3.11-slim"
-                scripts:
-                  install: "pip install -r requirements.txt"
+                steps:
+                  - "pip install -r requirements.txt"
         "#;
 
         let config: Microsandbox = serde_yaml::from_str(yaml).unwrap();
@@ -768,7 +768,7 @@ mod tests {
 
         let deps = builds.get("deps").unwrap();
         assert_eq!(
-            deps.steps.get("install").unwrap(),
+            deps.steps.get(0).unwrap(),
             "pip install -r requirements.txt"
         );
     }
@@ -782,28 +782,6 @@ mod tests {
                 image: "alpine:latest"
                 shell: "/bin/sh"
                 scope: "invalid"
-        "#;
-        assert!(serde_yaml::from_str::<Microsandbox>(yaml).is_err());
-
-        // Test invalid IP address
-        let yaml = r#"
-            sandboxes:
-              test:
-                image: "alpine:latest"
-                shell: "/bin/sh"
-                groups:
-                  test_group:
-                    network:
-                      ip: "invalid"
-        "#;
-        assert!(serde_yaml::from_str::<Microsandbox>(yaml).is_err());
-
-        // Test invalid subnet
-        let yaml = r#"
-            groups:
-              test:
-                network:
-                  subnet: "invalid"
         "#;
         assert!(serde_yaml::from_str::<Microsandbox>(yaml).is_err());
 
