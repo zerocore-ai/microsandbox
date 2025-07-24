@@ -364,17 +364,17 @@ async fn check_image_layers(
 /// Helper function to get full mode with file type bits
 fn get_full_mode(entry_type: &tar::EntryType, permission_bits: u32) -> u32 {
     let file_type_bits = if entry_type.is_file() {
-        libc::S_IFREG
+        libc::S_IFREG as u32
     } else if entry_type.is_dir() {
-        libc::S_IFDIR
+        libc::S_IFDIR as u32
     } else if entry_type.is_symlink() {
-        libc::S_IFLNK
+        libc::S_IFLNK as u32
     } else if entry_type.is_block_special() {
-        libc::S_IFBLK
+        libc::S_IFBLK as u32
     } else if entry_type.is_character_special() {
-        libc::S_IFCHR
+        libc::S_IFCHR as u32
     } else if entry_type.is_fifo() {
-        libc::S_IFIFO
+        libc::S_IFIFO as u32
     } else {
         0 // Unknown type
     };
@@ -397,13 +397,27 @@ fn set_stat_xattr(
         .map_err(|e| MicrosandboxError::LayerExtraction(format!("Invalid path: {:?}", e)))?;
 
     let result = unsafe {
-        libc::setxattr(
-            path_cstring.as_ptr(),
-            xattr_name.as_ptr(),
-            stat_data.as_ptr() as *const libc::c_void,
-            stat_data.len(),
-            0,
-        )
+        #[cfg(target_os = "macos")]
+        {
+            libc::setxattr(
+                path_cstring.as_ptr(),
+                xattr_name.as_ptr(),
+                stat_data.as_ptr() as *const libc::c_void,
+                stat_data.len(),
+                0, // position parameter for macOS
+                0, // options
+            )
+        }
+        #[cfg(target_os = "linux")]
+        {
+            libc::setxattr(
+                path_cstring.as_ptr(),
+                xattr_name.as_ptr(),
+                stat_data.as_ptr() as *const libc::c_void,
+                stat_data.len(),
+                0, // flags
+            )
+        }
     };
 
     if result != 0 {
