@@ -361,6 +361,27 @@ async fn check_image_layers(
     }
 }
 
+/// Helper function to get full mode with file type bits
+fn get_full_mode(entry_type: &tar::EntryType, permission_bits: u32) -> u32 {
+    let file_type_bits = if entry_type.is_file() {
+        libc::S_IFREG
+    } else if entry_type.is_dir() {
+        libc::S_IFDIR
+    } else if entry_type.is_symlink() {
+        libc::S_IFLNK
+    } else if entry_type.is_block_special() {
+        libc::S_IFBLK
+    } else if entry_type.is_character_special() {
+        libc::S_IFCHR
+    } else if entry_type.is_fifo() {
+        libc::S_IFIFO
+    } else {
+        0 // Unknown type
+    };
+
+    file_type_bits | permission_bits
+}
+
 /// Helper function to set xattr with stat information
 fn set_stat_xattr(
     path: &Path,
@@ -440,12 +461,15 @@ fn extract_tar_with_ownership_override<R: Read>(
         // Get the original metadata from the tar entry
         let original_uid = entry.header().uid()?;
         let original_gid = entry.header().gid()?;
-        let original_mode = entry.header().mode()?;
+        let permission_bits = entry.header().mode()?;
 
         // Check the entry type
         let entry_type = entry.header().entry_type();
         let is_symlink = entry_type.is_symlink();
         let is_hard_link = entry_type.is_hard_link();
+
+        // Calculate the full mode with file type bits
+        let original_mode = get_full_mode(&entry_type, permission_bits);
 
         // Handle hard links separately - collect them for processing after all files are extracted
         if is_hard_link {
@@ -482,20 +506,21 @@ fn extract_tar_with_ownership_override<R: Read>(
         let metadata = std::fs::metadata(&full_path)?;
         let is_dir = metadata.is_dir();
         let current_mode = metadata.permissions().mode();
+        let current_permission_bits = current_mode & 0o7777; // Extract only permission bits
 
         // Calculate the final desired permissions
-        let desired_mode = if is_dir {
+        let desired_permission_bits = if is_dir {
             // For directories, ensure at least u+rwx (0o700)
-            current_mode | 0o700
+            current_permission_bits | 0o700
         } else {
             // For files, ensure at least u+rw (0o600)
-            current_mode | 0o600
+            current_permission_bits | 0o600
         };
 
         // If we need to modify permissions, do it once
-        if current_mode != desired_mode {
+        if current_permission_bits != desired_permission_bits {
             let mut permissions = metadata.permissions();
-            permissions.set_mode(desired_mode);
+            permissions.set_mode(desired_permission_bits);
             std::fs::set_permissions(&full_path, permissions)?;
         }
 
@@ -531,12 +556,13 @@ fn extract_tar_with_ownership_override<R: Read>(
                 };
 
                 let current_mode = metadata.permissions().mode();
-                let desired_mode = current_mode | 0o600; // Ensure at least u+rw
+                let current_permission_bits = current_mode & 0o7777; // Extract only permission bits
+                let desired_permission_bits = current_permission_bits | 0o600; // Ensure at least u+rw
 
                 // Set permissions if needed
-                if current_mode != desired_mode {
+                if current_permission_bits != desired_permission_bits {
                     let mut permissions = metadata.permissions();
-                    permissions.set_mode(desired_mode);
+                    permissions.set_mode(desired_permission_bits);
                     if let Err(e) = std::fs::set_permissions(&link_info.link_path, permissions) {
                         tracing::warn!(
                             "Failed to set permissions for hard link {}: {}",
