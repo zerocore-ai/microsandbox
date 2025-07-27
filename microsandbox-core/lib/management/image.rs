@@ -18,14 +18,21 @@ use indicatif::{ProgressBar, ProgressStyle};
 use microsandbox_utils::term::{self, MULTI_PROGRESS};
 use microsandbox_utils::{env, EXTRACTED_LAYER_SUFFIX, LAYERS_SUBDIR, OCI_DB_FILENAME};
 use sqlx::{Pool, Sqlite};
+use std::ffi::CStr;
+#[allow(unused_imports)]
+use std::ffi::CString;
+use std::io::Read;
 #[cfg(feature = "cli")]
 use std::io::Result as IoResult;
+#[allow(unused_imports)]
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
-use std::ffi::CStr;
-use std::io::Read;
 use tar::Archive;
 use tempfile::tempdir;
 use tokio::fs;
+
+#[cfg(target_os = "macos")]
+const XATTR_NOFOLLOW: libc::c_int = 0x0001;
 #[cfg(feature = "cli")]
 use tokio::task::spawn_blocking;
 
@@ -499,22 +506,99 @@ fn extract_tar_with_ownership_override<R: Read>(
             continue; // Skip to next entry
         }
 
-        // Extract the entry (regular files, directories, symlinks)
+        // Handle symlinks specially based on platform
+        if is_symlink {
+            #[cfg(target_os = "linux")]
+            {
+                // On Linux, create file-backed symlinks to support xattr stat virtualization
+                // Read the symlink target from the tar entry
+                if let Ok(Some(link_name)) = entry.link_name() {
+                    let link_target = link_name.to_string_lossy();
+
+                    // Write the symlink target as file content
+                    std::fs::write(&full_path, link_target.as_bytes())?;
+
+                    // Set minimal permissions (0600) on the file
+                    let mut permissions = std::fs::metadata(&full_path)?.permissions();
+                    permissions.set_mode(0o600);
+                    std::fs::set_permissions(&full_path, permissions)?;
+
+                    // Store the symlink metadata including S_IFLNK in the xattr
+                    set_stat_xattr(
+                        &full_path,
+                        &xattr_name,
+                        original_uid,
+                        original_gid,
+                        original_mode,
+                    )?;
+
+                    tracing::trace!(
+                        "Created file-backed symlink {} -> {} with uid:gid:mode {}:{}:0{:o}",
+                        full_path.display(),
+                        link_target,
+                        original_uid,
+                        original_gid,
+                        original_mode
+                    );
+                }
+                continue;
+            }
+
+            #[cfg(target_os = "macos")]
+            {
+                // On macOS, extract the symlink normally and set xattr
+                entry
+                    .unpack(&full_path)
+                    .map_err(|e| MicrosandboxError::LayerExtraction(format!("{:?}", e)))?;
+
+                // Set xattr on the symlink using the nofollow flag
+                let path_cstring = CString::new(full_path.as_os_str().as_bytes()).map_err(|e| {
+                    MicrosandboxError::LayerExtraction(format!("Invalid path: {:?}", e))
+                })?;
+                let stat_data = format!("{}:{}:0{:o}", original_uid, original_gid, original_mode);
+
+                let result = unsafe {
+                    libc::setxattr(
+                        path_cstring.as_ptr(),
+                        xattr_name.as_ptr(),
+                        stat_data.as_ptr() as *const libc::c_void,
+                        stat_data.len(),
+                        0,                    // position parameter for macOS
+                        libc::XATTR_NOFOLLOW, // Don't follow symlinks
+                    )
+                };
+
+                if result == -1 {
+                    let errno = std::io::Error::last_os_error();
+                    if errno.raw_os_error() == Some(libc::ENOTSUP) {
+                        tracing::warn!(
+                            "Filesystem does not support xattrs for symlink {}, continuing without stat shadowing",
+                            full_path.display()
+                        );
+                    } else {
+                        return Err(MicrosandboxError::LayerExtraction(format!(
+                            "Failed to set xattr on symlink {}: {}",
+                            full_path.display(),
+                            errno
+                        )));
+                    }
+                } else {
+                    tracing::trace!(
+                        "Extracted symlink {} with xattr uid:gid:mode {}:{}:0{:o}",
+                        full_path.display(),
+                        original_uid,
+                        original_gid,
+                        original_mode
+                    );
+                }
+                continue;
+            }
+        }
+
+        // Extract the entry (regular files and directories)
         entry
             .unpack(&full_path)
             .map_err(|e| MicrosandboxError::LayerExtraction(format!("{:?}", e)))?;
-
-        // Skip all operations for symlinks
-        if is_symlink {
-            tracing::trace!(
-                "Extracted symlink {} with original uid:gid:mode {}:{}:{:o}",
-                full_path.display(),
-                original_uid,
-                original_gid,
-                original_mode
-            );
-            continue;
-        }
 
         // For regular files and directories, handle permissions and xattrs
         let metadata = std::fs::metadata(&full_path)?;
@@ -539,7 +623,13 @@ fn extract_tar_with_ownership_override<R: Read>(
         }
 
         // Store original uid/gid/mode in xattrs
-        set_stat_xattr(&full_path, &xattr_name, original_uid, original_gid, original_mode)?;
+        set_stat_xattr(
+            &full_path,
+            &xattr_name,
+            original_uid,
+            original_gid,
+            original_mode,
+        )?;
 
         tracing::trace!(
             "Extracted {} with original uid:gid:mode {}:{}:{:o}, stored in xattr",
@@ -588,9 +678,19 @@ fn extract_tar_with_ownership_override<R: Read>(
                 }
 
                 // Store original uid/gid/mode in xattrs
-                if let Err(e) = set_stat_xattr(&link_info.link_path, &xattr_name, link_info.uid, link_info.gid, link_info.mode) {
+                if let Err(e) = set_stat_xattr(
+                    &link_info.link_path,
+                    &xattr_name,
+                    link_info.uid,
+                    link_info.gid,
+                    link_info.mode,
+                ) {
                     // For hard links, we just warn on xattr errors instead of failing
-                    tracing::warn!("Failed to set xattr on hard link {}: {}", link_info.link_path.display(), e);
+                    tracing::warn!(
+                        "Failed to set xattr on hard link {}: {}",
+                        link_info.link_path.display(),
+                        e
+                    );
                 }
 
                 tracing::trace!(
