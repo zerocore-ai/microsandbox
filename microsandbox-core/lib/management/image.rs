@@ -128,7 +128,20 @@ pub async fn pull(
     }
 }
 
-/// Documentation for this coming soon
+/// Pulls a single image from the Github Container registry.
+///
+/// ## Arguments
+///
+/// * `image` - The reference to the Docker image to pull
+/// * `download_dir` - The directory to download the image layers to
+/// * `layer_path` - Optional custom path to store layers
+///
+/// ## Errors
+///
+/// Returns an error if:
+/// * Failed to create temporary directories
+/// * Failed to initialize Github Container registry client
+/// * Failed to pull the image from Github Container registry
 pub async fn pull_from_github_registry(
     image: &Reference,
     download_dir: impl AsRef<Path>,
@@ -148,6 +161,16 @@ pub async fn pull_from_github_registry(
     fs::create_dir_all(&layers_dir).await?;
 
     let github_registry = Ghcr::new(download_dir, &db_path).await?;
+
+    // Get or create a connection pool to the database
+    let pool = db::get_or_create_pool(&db_path, &OCI_DB_MIGRATOR).await?;
+
+    // Check if we need to pull the image
+    if check_image_layers(&pool, image, &layers_dir).await? {
+        tracing::info!("image {} and all its layers exist, skipping pull", image);
+        return Ok(());
+    }
+
     github_registry
         .pull_image(image.get_repository(), image.get_selector().clone())
         .await?;

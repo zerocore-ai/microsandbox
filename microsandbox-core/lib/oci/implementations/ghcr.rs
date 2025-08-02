@@ -518,3 +518,235 @@ impl OciRegistryPull for Ghcr {
         Ok(stream.boxed())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::DateTime;
+    use oci_spec::image::{DigestAlgorithm, Os};
+    use sqlx::Row;
+    use tokio::test;
+
+    #[test]
+    #[ignore = "makes network requests to Docker registry to pull an image"]
+    async fn test_docker_pull_image() -> anyhow::Result<()> {
+        let (client, temp_download_dir, _temp_db_dir) = helper::setup_test_client().await;
+        // for github container registry, the format of the repository is: owner/repo compared to
+        // library/repo for Docker
+        let repository = "github/super-linter";
+        let tag = "latest";
+        let result = client
+            .pull_image(repository, ReferenceSelector::tag(tag))
+            .await;
+        assert!(result.is_ok());
+
+        // Verify image record in database
+        let image = sqlx::query("SELECT * FROM images WHERE reference = ?")
+            .bind(format!("{GHCR_REGISTRY_DOMAIN}/{repository}:{tag}"))
+            .fetch_one(&client.oci_db)
+            .await?;
+        assert!(image.get::<i64, _>("size_bytes") > 0);
+
+        // Verify index record
+        let index_id = image.get::<i64, _>("id");
+        let index = sqlx::query("SELECT * FROM indexes WHERE image_id = ?")
+            .bind(index_id)
+            .fetch_one(&client.oci_db)
+            .await?;
+        assert_eq!(index.get::<i64, _>("schema_version"), 2);
+
+        // Verify manifest record
+        let manifest = sqlx::query("SELECT * FROM manifests WHERE image_id = ?")
+            .bind(index_id)
+            .fetch_one(&client.oci_db)
+            .await?;
+        assert_eq!(manifest.get::<i64, _>("schema_version"), 2);
+
+        // Verify config record
+        let manifest_id = manifest.get::<i64, _>("id");
+        let config = sqlx::query("SELECT * FROM configs WHERE manifest_id = ?")
+            .bind(manifest_id)
+            .fetch_one(&client.oci_db)
+            .await?;
+        assert!(matches!(config.get::<String, _>("os"), s if s == Os::Linux.to_string()));
+
+        // Verify layers were downloaded and match records
+        let layers = sqlx::query("SELECT * FROM layers WHERE manifest_id = ?")
+            .bind(manifest_id)
+            .fetch_all(&client.oci_db)
+            .await?;
+        assert!(!layers.is_empty());
+
+        for layer in layers {
+            let digest = layer.get::<String, _>("digest");
+            let size = layer.get::<i64, _>("size_bytes");
+            let layer_path = temp_download_dir.path().join(&digest);
+
+            // Verify layer file exists and has correct size
+            assert!(layer_path.exists(), "Layer file {} not found", digest);
+            assert_eq!(
+                fs::metadata(&layer_path).await?.len() as i64,
+                size,
+                "Layer {} size mismatch",
+                digest
+            );
+
+            // Verify layer hash
+            let parts: Vec<&str> = digest.split(':').collect();
+            let algorithm = &DigestAlgorithm::try_from(parts[0])?;
+            let expected_hash = parts[1];
+            let actual_hash = hex::encode(utils::get_file_hash(&layer_path, algorithm).await?);
+            assert_eq!(actual_hash, expected_hash, "Layer {} hash mismatch", digest);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    #[ignore = "makes network requests to Github Container registry to fetch image manifest"]
+    async fn test_docker_fetch_manifest() -> anyhow::Result<()> {
+        let (client, _temp_download_dir, _temp_db_dir) = helper::setup_test_client().await;
+        let repository = "github/super-linter";
+
+        let result = client.fetch_ghcr_manifest(repository, "latest").await;
+
+        assert!(result.is_ok());
+        let manifest = result.unwrap();
+
+        // Verify manifest has required fields
+        assert_eq!(manifest.schema_version(), 2);
+        assert!(manifest.config().size() > 0);
+        assert!(manifest
+            .config()
+            .digest()
+            .to_string()
+            .starts_with("sha256:"));
+        assert!(manifest
+            .config()
+            .media_type()
+            .to_string()
+            .contains("config"));
+
+        // Verify layers
+        assert!(!manifest.layers().is_empty());
+        for layer in manifest.layers() {
+            assert!(layer.size() > 0);
+            assert!(layer.digest().to_string().starts_with("sha256:"));
+            assert!(layer.media_type().to_string().contains("layer"));
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    #[ignore = "makes network requests to Github Container registry to fetch image config"]
+    async fn test_docker_fetch_config() -> anyhow::Result<()> {
+        let (client, _temp_download_dir, _temp_db_dir) = helper::setup_test_client().await;
+        let repository = "library/alpine";
+
+        let manifest = client.fetch_ghcr_manifest(repository, "latest").await?;
+
+        let result = client
+            .fetch_config(repository, manifest.config().digest())
+            .await;
+        assert!(result.is_ok());
+
+        let config = result.unwrap();
+
+        // Verify required OCI spec fields
+        assert_eq!(*config.os(), Os::Linux);
+        assert!(config.rootfs().typ() == "layers");
+        assert!(!config.rootfs().diff_ids().is_empty());
+
+        // Verify optional but common fields
+        if let Some(created) = config.created() {
+            let created_time = DateTime::parse_from_rfc3339(created).unwrap();
+            assert!(created_time.timestamp_millis() > 0);
+        }
+        if let Some(config_fields) = config.config() {
+            if let Some(env) = config_fields.env() {
+                assert!(!env.is_empty());
+            }
+            if let Some(cmd) = config_fields.cmd() {
+                assert!(!cmd.is_empty());
+            }
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    #[ignore = "makes network requests to Github Container Registry to fetch image blob"]
+    async fn test_docker_fetch_image_blob() -> anyhow::Result<()> {
+        let (client, temp_download_dir, _temp_db_dir) = helper::setup_test_client().await;
+        let repository = "github/super-linter";
+
+        let manifest = client.fetch_ghcr_manifest(repository, "latest").await?;
+
+        let layer = manifest.layers().first().unwrap();
+        let mut stream = client
+            .fetch_image_blob(repository, layer.digest(), 0..)
+            .await?;
+
+        // Download the blob to a temporary file
+        let temp_file = temp_download_dir.path().join("test_blob");
+        let mut file = fs::File::create(&temp_file).await?;
+        let mut total_size = 0;
+
+        while let Some(chunk) = stream.next().await {
+            let bytes = chunk?;
+            total_size += bytes.len();
+            file.write_all(&bytes).await?;
+        }
+
+        // Verify size matches
+        assert!(total_size > 0);
+        assert_eq!(total_size as u64, layer.size());
+
+        // Verify hash matches
+        let algorithm = layer.digest().algorithm();
+        let expected_hash = layer.digest().digest();
+        let actual_hash = hex::encode(utils::get_file_hash(&temp_file, algorithm).await?);
+        assert_eq!(actual_hash, expected_hash);
+
+        Ok(())
+    }
+
+    #[test]
+    #[ignore = "makes network requests to Github Container registry to get authentication credentials"]
+    async fn test_docker_get_access_credentials() -> anyhow::Result<()> {
+        let (client, _temp_download_dir, _temp_db_dir) = helper::setup_test_client().await;
+
+        let result = client
+            .get_auth_credentials("github/super-linter", GHCR_REGISTRY_DOMAIN, &["pull"])
+            .await;
+
+        assert!(result.is_ok());
+        let credentials = result.unwrap();
+
+        // Verify credential fields. GH only returns token field.
+        assert!(!credentials.token.is_empty());
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod helper {
+    use tempfile::TempDir;
+
+    use super::*;
+
+    // Helper function to create a test Docker registry client
+    pub(super) async fn setup_test_client() -> (Ghcr, TempDir, TempDir) {
+        let temp_download_dir = TempDir::new().unwrap();
+        let temp_db_dir = TempDir::new().unwrap();
+        let db_path = temp_db_dir.path().join("test.db");
+
+        let client = Ghcr::new(temp_download_dir.path().to_path_buf(), db_path)
+            .await
+            .unwrap();
+
+        (client, temp_download_dir, temp_db_dir)
+    }
+}
