@@ -11,6 +11,7 @@ private
 *.tmp
 .history
 .DS_Store
+.zed
 
 # microsandbox
 ignore/

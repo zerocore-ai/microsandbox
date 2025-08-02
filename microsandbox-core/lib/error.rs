@@ -8,7 +8,7 @@ use std::{
 };
 use thiserror::Error;
 
-use crate::oci::DockerRegistryResponseError;
+use crate::oci::{DockerRegistryResponseError, GhcrRegistryResponseError};
 
 //--------------------------------------------------------------------------------------------------
 // Types
@@ -247,6 +247,10 @@ pub enum MicrosandboxError {
     /// An error that occurred when a Docker registry response error occurred
     #[error("docker registry response error: {0}")]
     DockerRegistryResponseError(#[from] DockerRegistryResponseError),
+
+    /// An error that occurred when a Github registry response error occurred
+    #[error("{0}")]
+    GhcrRegistryResponseError(#[from] GhcrRegistryResponseError),
 
     /// An error that occurred when parsing an image reference selector with an invalid format
     #[error("invalid image reference    selector format: {0}")]

@@ -45,6 +45,18 @@ pub trait OciRegistryPull {
         digest: &Digest,
     ) -> MicrosandboxResult<ImageManifest>;
 
+    /// Fetches an image manifest from Github Container Registry, using the image tag.
+    /// This is optional because Ghcr deviates a bit from Docker as it does not return an image index.
+    ///
+    /// Provides the list of layers and configurations for an image.
+    async fn fetch_ghcr_manifest(
+        &self,
+        _repository: &str,
+        _reference: &str,
+    ) -> MicrosandboxResult<ImageManifest> {
+        unimplemented!()
+    }
+
     /// Fetches the image configuration by digest.
     /// Returns metadata about the image, such as environment variables and entrypoint.
     async fn fetch_config(
