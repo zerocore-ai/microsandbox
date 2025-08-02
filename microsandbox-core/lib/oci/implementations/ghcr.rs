@@ -53,7 +53,7 @@ pub struct Ghcr {
 
 /// Stores authentication credentials obtained from the Github Container Registry, including tokens and expiration details.
 #[derive(Debug, Serialize, Deserialize)]
-pub struct GhrcAuthMaterial {
+pub struct GhcrAuthMaterial {
     /// The token used to authenticate the requests to the Github Container Registry
     token: String,
 }
@@ -122,7 +122,7 @@ impl Ghcr {
         repository: &str,
         service: &str,
         scopes: &[&str],
-    ) -> MicrosandboxResult<GhrcAuthMaterial> {
+    ) -> MicrosandboxResult<GhcrAuthMaterial> {
         let request = self
             .client
             .get(GHCR_AUTH_REALM)
@@ -136,7 +136,7 @@ impl Ghcr {
             .build()?;
 
         let response = self.client.execute(request).await?;
-        let auth_credentials = response.json::<GhrcAuthMaterial>().await?;
+        let auth_credentials = response.json::<GhcrAuthMaterial>().await?;
 
         Ok(auth_credentials)
     }
