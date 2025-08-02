@@ -91,7 +91,7 @@ const GHCR_MANIFEST_LIST_MIME_TYPE: &str = "application/vnd.oci.image.manifest.v
 const GHCR_CONFIG_MIME_TYPE: &str = "application/vnd.oci.container.image.v1+json";
 
 /// The MIME type for the Github Container Registry v2 (OCI format) image blobs, used to identify the format of the image blob.
-const IMAGE_BLOB_MIME_TYPE: &str = "application/vnd.oci.image.rootfs.diff.tar.gzip";
+const GHCR_IMAGE_BLOB_MIME_TYPE: &str = "application/vnd.oci.image.rootfs.diff.tar.gzip";
 
 /// Spinner message used for downloading layers.
 const DOWNLOAD_LAYER_MSG: &str = "Download layers";
@@ -509,7 +509,7 @@ impl OciRegistryPull for Ghcr {
                 GHCR_REGISTRY_URL, repository, digest
             ))
             .bearer_auth(token)
-            .header("Accept")
+            .header("Accept", GHCR_IMAGE_BLOB_MIME_TYPE)
             .header("Range", format!("bytes={start}-{end}"))
             .build()?;
 
