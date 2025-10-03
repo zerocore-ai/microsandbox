@@ -1,0 +1,19 @@
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://microsandbox.dev/sitemap.xml
+
+# Block access to API routes and admin areas
+Disallow: /api/
+Disallow: /_next/
+Disallow: /admin/
+
+# Allow crawling of important pages
+Allow: /
+Allow: /features
+Allow: /about
+Allow: /pricing
+Allow: /organizations
+Allow: /blog
+Allow: /get-started
