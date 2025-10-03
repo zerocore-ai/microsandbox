@@ -1,0 +1,42 @@
+{
+  "name": "microsandbox-landing-page",
+  "version": "1.0.0",
+  "description": "Official landing page for microsandbox - Secure code execution platform",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.21.1",
+    "react-helmet-async": "^2.0.4"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.43",
+    "@types/react-dom": "^18.2.17",
+    "@vitejs/plugin-react": "^4.2.1",
+    "autoprefixer": "^10.4.16",
+    "eslint": "^8.55.0",
+    "eslint-plugin-react": "^7.33.2",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-react-refresh": "^0.4.5",
+    "postcss": "^8.4.32",
+    "tailwindcss": "^3.4.0",
+    "@tailwindcss/typography": "^0.5.10",
+    "vite": "^5.0.8"
+  },
+  "keywords": [
+    "microsandbox",
+    "secure-code-execution",
+    "sandbox",
+    "microvm",
+    "code-isolation",
+    "ai-code-execution"
+  ],
+  "author": "microsandbox Team",
+  "license": "Apache-2.0"
+}
