@@ -23,11 +23,13 @@
 </div>
 <br/>
 
-# <img height="20" src="https://octicons-col.vercel.app/package/A770EF">&nbsp;Microsandbox
+## <img height="20" src="https://octicons-col.vercel.app/package/A770EF">&nbsp;Microsandbox
 
 Microsandbox makes it **easy** to run untrusted workloads within a **hardware-isolated** and **fast startup** execution environment.
 
 Running untrusted code securely is hard. Traditional solutions—containers, VMs, or cloud sandboxes—each trade off speed, isolation, or control. Microsandbox aims to give the best of all worlds.
+
+<br/>
 
 ## <img height="18" src="https://octicons-col.vercel.app/sparkle/A770EF">&nbsp;&nbsp;Key Features
 
@@ -39,50 +41,52 @@ Running untrusted code securely is hard. Traditional solutions—containers, VMs
 
 Microsandbox is designed to be the execution backbone of the agentic web—fast, secure, and flexible.
 
-# <img height="18" src="https://octicons-col.vercel.app/device-desktop/A770EF">&nbsp;&nbsp;Demo
+<br/>
 
-## Sandbox Environment
+## <img height="18" src="https://octicons-col.vercel.app/device-desktop/A770EF">&nbsp;&nbsp;Demo
 
-<div>
-  <video src="https://github.com/user-attachments/assets/23618f92-5897-44d1-bfa6-1058f30c09ef" width="850" controls></video>
-  <br/>
+<div align='center'>
+  <h4>Sandbox Environment</h4>
+  <video src="https://github.com/user-attachments/assets/23618f92-5897-44d1-bfa6-1058f30c09ef" width="100%" controls></video>
   <sup><small><a href="https://asciinema.org/a/itQE92vIJiyq1PAPnaGURzDpv" target="_blank">[ASCIINEMA →]</a></small></sup>
 </div>
 
-## With Claude
-
-<div>
-  <img alt="Claude MCP Demo" src="https://github.com/user-attachments/assets/d91df12c-e425-48c0-a881-dec9a8d45868" width="850"></img>
+<div align='center'>
+  <h4>With Claude</h4>
+  <img alt="Claude MCP Demo" src="https://github.com/user-attachments/assets/d91df12c-e425-48c0-a881-dec9a8d45868" width="100%"></img>
 </div>
-<br>
 
-# Getting Started
+<br/>
 
-## <img height="13" src="https://octicons-col.vercel.app/north-star/A770EF">&nbsp;&nbsp;Prerequisite
+## <img height="13" src="https://octicons-col.vercel.app/north-star/A770EF">&nbsp;&nbsp;Getting Started
 
-#### <img height="14" src="https://octicons-col.vercel.app/download/A770EF">&nbsp;&nbsp;1. Download `microsandbox`
+#### PREREQUISITE
+
+##### <img height="14" src="https://octicons-col.vercel.app/download/A770EF">&nbsp;&nbsp;1. Download `microsandbox`
 
 ```sh
 curl -sSL https://get.microsandbox.dev | sh
 ```
 
-#### <img height="14" src="https://octicons-col.vercel.app/play/A770EF">&nbsp;&nbsp;2. Start the server
+##### <img height="14" src="https://octicons-col.vercel.app/play/A770EF">&nbsp;&nbsp;2. Start the server
 
 ```sh
 msb server start --dev
 ```
 
-#### <img height="14" src="https://octicons-col.vercel.app/cache/A770EF">&nbsp;&nbsp;(Optional) 3. Pull the environment image
+##### <img height="14" src="https://octicons-col.vercel.app/cache/A770EF">&nbsp;&nbsp;3. Pull the environment image [Optional]
 
 ```sh
 msb pull microsandbox/python
 ```
 
-## <img height="18" src="https://octicons-col.vercel.app/mortar-board/A770EF">&nbsp;&nbsp;Basics
+##
+
+#### BASICS
 
 `microsandbox` ships with a bunch of flexible commands to make it easy to manage and access sandboxes which are highlighted below
 
-### <img height="14" src="https://octicons-col.vercel.app/stopwatch/A770EF">&nbsp;&nbsp;Temporary Sandbox
+##### <img height="14" src="https://octicons-col.vercel.app/stopwatch/A770EF">&nbsp;&nbsp;Temporary Sandbox
 
 For experimentation or one-off tasks, temporary sandboxes provide a clean environment that leaves no trace on exit. For example, create a sandbox based on the `microsandbox/python` image by running:
 
@@ -90,7 +94,7 @@ For experimentation or one-off tasks, temporary sandboxes provide a clean enviro
 msx python # or `msb exe --image python`
 ```
 
-### <img height="14" src="https://octicons-col.vercel.app/pause/A770EF">&nbsp;&nbsp;System-wide Sandboxes
+##### <img height="14" src="https://octicons-col.vercel.app/pause/A770EF">&nbsp;&nbsp;System-wide Sandboxes
 
 This provides the option to run long-lived sandboxes which are automatically setup as a system-wide executable. This also makes frequently used sandboxes incredibly convenient to access — no need to navigate to specific directories or remember complex commands.
 
@@ -108,9 +112,11 @@ py-data # From any directory, run the sandbox
 >
 > For example, `msb add --help`.
 
+<br/>
+
 ## <img height="18" src="https://octicons-col.vercel.app/package-dependencies/A770EF">&nbsp;&nbsp;SDK&nbsp;&nbsp;<sup><sup>BETA</sup></sup>
 
-#### <img height="14" src="https://octicons-col.vercel.app/move-to-bottom/A770EF">&nbsp;&nbsp;1. Install the SDK
+##### <img height="14" src="https://octicons-col.vercel.app/move-to-bottom/A770EF">&nbsp;&nbsp;1. Install the SDK
 
 > See open issues for future language support.
 
@@ -120,7 +126,7 @@ py-data # From any directory, run the sandbox
 | Rust       | `cargo add microsandbox`   |
 | JavaScript | `npm install microsandbox` |
 
-#### <img height="14" src="https://octicons-col.vercel.app/file-binary/A770EF">&nbsp;&nbsp;2. Execute the Code
+##### <img height="14" src="https://octicons-col.vercel.app/file-binary/A770EF">&nbsp;&nbsp;2. Execute the Code
 
 > The first run pulls the environment image, so it’ll take a bit longer. You can pre-pull an image it to make runs instant. For more information on how to use the SDK, refer to the [SDK Readme](./sdk/README.md).
 
@@ -182,17 +188,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
+<br/>
+
 ## <img height="18" src="https://octicons-col.vercel.app/space/A770EF">&nbsp;&nbsp;Project Sandbox&nbsp;&nbsp;<sup><sup>BETA</sup></sup>
 
 Beyond the SDK, microsandbox supports project-based development with the familiar package-manager workflow devs are used to. Think of it like `npm` or `cargo`, but for sandboxes!
 
-### <img height="14" src="https://octicons-col.vercel.app/device-desktop/A770EF">&nbsp;&nbsp;Quick Demo
+#### QUICK DEMO
 
-<a href="https://asciinema.org/a/7eOFf2Ovigi473FsKgr3Lpve1" target="_blank"><img src="https://github.com/user-attachments/assets/3a9d1de4-2370-4d5a-a40d-9aa7315aa934" width="850"/></a>
+<div align="center">
+  <a href="https://asciinema.org/a/7eOFf2Ovigi473FsKgr3Lpve1" target="_blank"><img src="https://github.com/user-attachments/assets/3a9d1de4-2370-4d5a-a40d-9aa7315aa934" width="100%"/></a>
+</div>
 
-### <img height="14" src="https://octicons-col.vercel.app/zap/A770EF">&nbsp;&nbsp;Setup Guide
+##
 
-#### <img height="14" src="https://octicons-col.vercel.app/plus-circle/A770EF">&nbsp;&nbsp;1. Create a Sandbox Project
+#### SETUP GUIDE
+
+##### <img height="14" src="https://octicons-col.vercel.app/plus-circle/A770EF">&nbsp;&nbsp;1. Create a Sandbox Project
 
 Each sandbox project needs a file, `Sandboxfile` at the root of the project directory, which serves as the configuration manifest for your sandbox environments. To initialize one, run:
 
@@ -200,7 +212,7 @@ Each sandbox project needs a file, `Sandboxfile` at the root of the project dire
 msb init
 ```
 
-#### <img height="14" src="https://octicons-col.vercel.app/file-added/A770EF">&nbsp;&nbsp;2. Add a Sandbox to the Project
+##### <img height="14" src="https://octicons-col.vercel.app/file-added/A770EF">&nbsp;&nbsp;2. Add a Sandbox to the Project
 
 Proceed to register a new `python` sandbox named `app` in your `Sandboxfile`.
 
@@ -212,7 +224,7 @@ msb add app \
     --start 'python -c "print(\"hello\")"'
 ```
 
-#### <img height="14" src="https://octicons-col.vercel.app/codescan/A770EF">&nbsp;&nbsp;3. Inspect `Sandboxfile`
+##### <img height="14" src="https://octicons-col.vercel.app/codescan/A770EF">&nbsp;&nbsp;3. Inspect `Sandboxfile`
 
 The newly created sandbox, `app` should be registered in your `Sandboxfile`. If there was a pre-existing `Sandboxfile`, it'd be appended to it. It should be similar to this:
 
@@ -226,7 +238,7 @@ sandboxes:
       start: python -c "print(\"hello\")"
 ```
 
-#### <img height="14" src="https://octicons-col.vercel.app/zap/A770EF">&nbsp;&nbsp;4. Running a Project-Defined Sandbox
+##### <img height="14" src="https://octicons-col.vercel.app/zap/A770EF">&nbsp;&nbsp;4. Running a Project-Defined Sandbox
 
 Next is to run a sandbox defined in your project. This would execute the default _start_ script of your sandbox. For more control, you can directly specify which script to run e.g. `msr app~start`.
 
@@ -236,19 +248,27 @@ msr app # or `msb run --sandbox app`
 
 > When running project sandboxes, all file changes and installations made inside the sandbox are automatically persisted to the `./menv` directory. This means you can stop and restart your sandbox any time without losing your work. Your development environment will be exactly as you left it.
 
-# <sub><img height="18" src="https://octicons-col.vercel.app/light-bulb/A770EF">&nbsp;&nbsp;Use Cases
+<br/>
+
+## <img height="18" src="https://octicons-col.vercel.app/light-bulb/A770EF">&nbsp;&nbsp;Use Cases
 
 Wondering how you can use `microsandbox` in your next project, see our sample [use cases](./USE_CASE.md).
 
-# <sub><img height="18" src="https://octicons-col.vercel.app/gear/A770EF">&nbsp;&nbsp;Contributing</sub>
+<br/>
+
+## <img height="18" src="https://octicons-col.vercel.app/gear/A770EF">&nbsp;&nbsp;Contributing
 
 Interested in contributing to `microsandbox`? Check out our [Development Guide](./DEVELOPMENT.md) for instructions on setting up your development environment, building the project, running tests, and creating releases. For contribution guidelines, please refer to [CONTRIBUTING.md](./CONTRIBUTING.md).
 
-# <sub><img height="18" src="https://octicons-col.vercel.app/law/A770EF">&nbsp;&nbsp;License</sub>
+<br/>
+
+## <img height="18" src="https://octicons-col.vercel.app/law/A770EF">&nbsp;&nbsp;License
 
 This project is licensed under the [Apache License 2.0](./LICENSE).
 
-# <sub><img height="18" src="https://octicons-col.vercel.app/heart/A770EF">&nbsp;&nbsp;Ackowledgements</sub>
+<br/>
+
+## <img height="18" src="https://octicons-col.vercel.app/heart/A770EF">&nbsp;&nbsp;Ackowledgements
 
 Special thanks to all our contributors, testers, and community members who help make microsandbox better every day! We'd like to thank the following projects and communities that made `microsandbox` possible:
 
