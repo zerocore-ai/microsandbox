@@ -6,7 +6,7 @@
 
 use crate::{
     management::db::{self, OCI_DB_MIGRATOR},
-    oci::{DockerRegistry, Ghcr, OciRegistryPull, Reference},
+    oci::{DockerRegistry, OciRegistryPull, Reference},
     MicrosandboxError, MicrosandboxResult,
 };
 #[cfg(feature = "cli")]
@@ -18,11 +18,11 @@ use indicatif::{ProgressBar, ProgressStyle};
 use microsandbox_utils::term::{self, MULTI_PROGRESS};
 use microsandbox_utils::{env, EXTRACTED_LAYER_SUFFIX, LAYERS_SUBDIR, OCI_DB_FILENAME};
 use sqlx::{Pool, Sqlite};
-use std::ffi::CStr;
-use std::io::Read;
 #[cfg(feature = "cli")]
 use std::io::Result as IoResult;
 use std::path::{Path, PathBuf};
+use std::ffi::CStr;
+use std::io::Read;
 use tar::Archive;
 use tempfile::tempdir;
 use tokio::fs;
@@ -38,8 +38,6 @@ const DOCKER_REGISTRY: &str = "docker.io";
 
 /// The domain name for the Sandboxes registry.
 const SANDBOXES_REGISTRY: &str = "sandboxes.io";
-
-const GITHUB_CONTAINER_REGISTRY: &str = "ghcr.io";
 
 #[cfg(feature = "cli")]
 /// Spinner message used for extracting layers.
@@ -118,97 +116,12 @@ pub async fn pull(
         pull_from_docker_registry(&name, &temp_download_dir, layer_path).await
     } else if registry == SANDBOXES_REGISTRY {
         pull_from_sandboxes_registry(&name, &temp_download_dir, layer_path).await
-    } else if registry == GITHUB_CONTAINER_REGISTRY {
-        pull_from_github_registry(&name, &temp_download_dir, layer_path).await
     } else {
         Err(MicrosandboxError::InvalidArgument(format!(
             "Unsupported registry: {}",
             registry
         )))
     }
-}
-
-/// Pulls a single image from the Github Container registry.
-///
-/// ## Arguments
-///
-/// * `image` - The reference to the Docker image to pull
-/// * `download_dir` - The directory to download the image layers to
-/// * `layer_path` - Optional custom path to store layers
-///
-/// ## Errors
-///
-/// Returns an error if:
-/// * Failed to create temporary directories
-/// * Failed to initialize Github Container registry client
-/// * Failed to pull the image from Github Container registry
-pub async fn pull_from_github_registry(
-    image: &Reference,
-    download_dir: impl AsRef<Path>,
-    layer_path: Option<PathBuf>,
-) -> Result<(), MicrosandboxError> {
-    let download_dir = download_dir.as_ref();
-    let microsandbox_home_path = env::get_microsandbox_home_path();
-    let db_path = microsandbox_home_path.join(OCI_DB_FILENAME);
-
-    // Use custom layer_path if specified, otherwise use default microsandbox layers directory
-    let layers_dir = match layer_path {
-        Some(path) => path,
-        None => microsandbox_home_path.join(LAYERS_SUBDIR),
-    };
-
-    // Create layers directory if it doesn't exist
-    fs::create_dir_all(&layers_dir).await?;
-
-    let github_registry = Ghcr::new(download_dir, &db_path).await?;
-
-    // Get or create a connection pool to the database
-    let pool = db::get_or_create_pool(&db_path, &OCI_DB_MIGRATOR).await?;
-
-    // Check if we need to pull the image
-    if check_image_layers(&pool, image, &layers_dir).await? {
-        tracing::info!("image {} and all its layers exist, skipping pull", image);
-        return Ok(());
-    }
-
-    github_registry
-        .pull_image(image.get_repository(), image.get_selector().clone())
-        .await?;
-
-    // Find and extract layers in parallel
-    let layer_paths = collect_layer_files(download_dir).await?;
-
-    #[cfg(feature = "cli")]
-    let extract_layers_sp = term::create_spinner(
-        EXTRACT_LAYERS_MSG.to_string(),
-        None,
-        Some(layer_paths.len() as u64),
-    );
-
-    let extraction_futures: Vec<_> = layer_paths
-        .into_iter()
-        .map(|path| {
-            let layers_dir = layers_dir.clone();
-            #[cfg(feature = "cli")]
-            let extract_layers_sp = extract_layers_sp.clone();
-            async move {
-                let result = extract_layer(path, &layers_dir).await;
-                #[cfg(feature = "cli")]
-                extract_layers_sp.inc(1);
-                result
-            }
-        })
-        .collect();
-
-    // Wait for all extractions to complete
-    for result in future::join_all(extraction_futures).await {
-        result?;
-    }
-
-    #[cfg(feature = "cli")]
-    extract_layers_sp.finish();
-
-    Ok(())
 }
 
 /// Pulls a single image from the Docker registry.
@@ -626,13 +539,7 @@ fn extract_tar_with_ownership_override<R: Read>(
         }
 
         // Store original uid/gid/mode in xattrs
-        set_stat_xattr(
-            &full_path,
-            &xattr_name,
-            original_uid,
-            original_gid,
-            original_mode,
-        )?;
+        set_stat_xattr(&full_path, &xattr_name, original_uid, original_gid, original_mode)?;
 
         tracing::trace!(
             "Extracted {} with original uid:gid:mode {}:{}:{:o}, stored in xattr",
@@ -681,19 +588,9 @@ fn extract_tar_with_ownership_override<R: Read>(
                 }
 
                 // Store original uid/gid/mode in xattrs
-                if let Err(e) = set_stat_xattr(
-                    &link_info.link_path,
-                    &xattr_name,
-                    link_info.uid,
-                    link_info.gid,
-                    link_info.mode,
-                ) {
+                if let Err(e) = set_stat_xattr(&link_info.link_path, &xattr_name, link_info.uid, link_info.gid, link_info.mode) {
                     // For hard links, we just warn on xattr errors instead of failing
-                    tracing::warn!(
-                        "Failed to set xattr on hard link {}: {}",
-                        link_info.link_path.display(),
-                        e
-                    );
+                    tracing::warn!("Failed to set xattr on hard link {}: {}", link_info.link_path.display(), e);
                 }
 
                 tracing::trace!(
