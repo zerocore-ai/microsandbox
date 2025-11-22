@@ -102,9 +102,19 @@ detect_platform() {
         ARCH="arm64"
     fi
 
+    # Check for unsupported combinations
+    if [ "$OS" = "darwin" ] && [ "$ARCH" = "x86_64" ]; then
+        error "Darwin x86_64 (Intel Mac) is not currently supported"
+        error "Supported platforms: darwin-arm64 (Apple Silicon), linux-x86_64, linux-aarch64"
+        error "For more information, visit: https://github.com/${GITHUB_REPO}/releases"
+        exit 1
+    fi
+
     PLATFORM="${OS}-${ARCH}"
     ARCHIVE_NAME="microsandbox-${VERSION}-${PLATFORM}.tar.gz"
     CHECKSUM_FILE="${ARCHIVE_NAME}.sha256"
+    
+    info "Detected platform: ${PLATFORM}"
 }
 
 # Cleanup function
@@ -140,10 +150,28 @@ download_files() {
     cd "$TEMP_DIR" || exit 1
 
     # Download archive with progress bar
-    curl -L -# -o "${ARCHIVE_NAME}" "${BASE_URL}/${ARCHIVE_NAME}" || { error "Failed to download archive"; exit 1; }
+    info "Downloading from: ${BASE_URL}/${ARCHIVE_NAME}"
+    if ! curl -L -f -# -o "${ARCHIVE_NAME}" "${BASE_URL}/${ARCHIVE_NAME}" 2>/tmp/curl_error.log; then
+        if grep -q "404" /tmp/curl_error.log 2>/dev/null; then
+            error "Archive not found: ${ARCHIVE_NAME}"
+            error "This platform (${PLATFORM}) may not be supported for version ${VERSION}"
+            error "Available releases: https://github.com/${GITHUB_REPO}/releases"
+        else
+            error "Failed to download archive: $(cat /tmp/curl_error.log 2>/dev/null || echo 'Unknown error')"
+        fi
+        exit 1
+    fi
 
     # Download checksum silently
-    curl -L -s -o "${CHECKSUM_FILE}" "${BASE_URL}/${CHECKSUM_FILE}" || { error "Failed to download checksum"; exit 1; }
+    if ! curl -L -f -s -o "${CHECKSUM_FILE}" "${BASE_URL}/${CHECKSUM_FILE}" 2>/tmp/curl_error.log; then
+        if grep -q "404" /tmp/curl_error.log 2>/dev/null; then
+            error "Checksum file not found: ${CHECKSUM_FILE}"
+            error "The release may be incomplete or this platform is not supported"
+        else
+            error "Failed to download checksum: $(cat /tmp/curl_error.log 2>/dev/null || echo 'Unknown error')"
+        fi
+        exit 1
+    fi
 }
 
 # Verify checksum
@@ -151,9 +179,26 @@ verify_checksum() {
     info "Verifying checksum..."
     cd "$TEMP_DIR" || exit 1
 
-    # Redirect detailed output to /dev/null but keep the exit status
-    if ! (shasum -a 256 -c "$CHECKSUM_FILE" >/dev/null 2>&1); then
+    # Check if checksum file exists and is not empty
+    if [ ! -f "$CHECKSUM_FILE" ]; then
+        error "Checksum file not found: $CHECKSUM_FILE"
+        exit 1
+    fi
+
+    if [ ! -s "$CHECKSUM_FILE" ]; then
+        error "Checksum file is empty: $CHECKSUM_FILE"
+        exit 1
+    fi
+
+    # Show what we're verifying
+    info "Expected checksum: $(cat "$CHECKSUM_FILE")"
+
+    # Verify with more detailed error output
+    if ! shasum -a 256 -c "$CHECKSUM_FILE" 2>/tmp/shasum_error.log; then
         error "Checksum verification failed"
+        error "Expected: $(cat "$CHECKSUM_FILE" 2>/dev/null || echo 'Unable to read checksum file')"
+        error "Actual: $(shasum -a 256 "$ARCHIVE_NAME" 2>/dev/null || echo 'Unable to calculate checksum')"
+        error "Error details: $(cat /tmp/shasum_error.log 2>/dev/null || echo 'No additional details')"
         exit 1
     fi
 }
@@ -163,21 +208,38 @@ install_files() {
     info "Extracting files..."
     cd "$TEMP_DIR" || exit 1
 
-    tar xzf "$ARCHIVE_NAME" || { error "Failed to extract archive"; exit 1; }
+    if ! tar xzf "$ARCHIVE_NAME" 2>/tmp/tar_error.log; then
+        error "Failed to extract archive"
+        error "Archive: $ARCHIVE_NAME"
+        error "Error: $(cat /tmp/tar_error.log 2>/dev/null || echo 'Unknown extraction error')"
+        exit 1
+    fi
 
     EXTRACT_DIR="microsandbox-${VERSION}-${PLATFORM}"
-    cd "$EXTRACT_DIR" || { error "Failed to enter extract directory"; exit 1; }
+    if [ ! -d "$EXTRACT_DIR" ]; then
+        error "Expected directory not found after extraction: $EXTRACT_DIR"
+        error "Archive contents:"
+        tar tzf "$ARCHIVE_NAME" | head -20 || echo "Unable to list archive contents"
+        exit 1
+    fi
+
+    cd "$EXTRACT_DIR" || { error "Failed to enter extract directory: $EXTRACT_DIR"; exit 1; }
 
     # Install main executables
     info "Installing executables..."
-    install -m 755 msb "$BIN_DIR/" || { error "Failed to install msb"; exit 1; }
-    install -m 755 msbrun "$BIN_DIR/" || { error "Failed to install msbrun"; exit 1; }
-    install -m 755 msbserver "$BIN_DIR/" || { error "Failed to install msbserver"; exit 1; }
-
-    # Install alias executables
-    install -m 755 msr "$BIN_DIR/" || { error "Failed to install msr"; exit 1; }
-    install -m 755 msx "$BIN_DIR/" || { error "Failed to install msx"; exit 1; }
-    install -m 755 msi "$BIN_DIR/" || { error "Failed to install msi"; exit 1; }
+    for exe in msb msbrun msbserver msr msx msi; do
+        if [ ! -f "$exe" ]; then
+            error "Expected executable not found in archive: $exe"
+            error "Archive contains: $(ls -la)"
+            exit 1
+        fi
+        
+        if ! install -m 755 "$exe" "$BIN_DIR/"; then
+            error "Failed to install $exe to $BIN_DIR/"
+            error "Permission issue? Try: sudo mkdir -p $BIN_DIR && sudo chown $USER $BIN_DIR"
+            exit 1
+        fi
+    done
 
     # Install libraries
     info "Installing libraries..."
