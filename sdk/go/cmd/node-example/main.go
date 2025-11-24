@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	msb "github.com/keithang/microsandbox/sdk/go"
+	msb "github.com/microsandbox/microsandbox/sdk/go"
 )
 
 // basicExample demonstrates basic JavaScript code execution.
