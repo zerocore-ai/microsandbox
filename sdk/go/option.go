@@ -96,6 +96,9 @@ func fillDefaultConfigs() Option {
 				panic(ErrAPIKeyMustBeSpecified)
 			}
 		}
+		if msb.cfg.reqIDPrd == nil {
+			msb.cfg.reqIDPrd = defaultReqIdProducer
+		}
 	}
 }
 

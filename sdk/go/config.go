@@ -1,5 +1,7 @@
 package msb
 
+import "github.com/microsandbox/microsandbox/sdk/go/uuid"
+
 type ReqIdProducer func() string
 
 type config struct {
@@ -16,3 +18,7 @@ const (
 	defaultNamespace    = "default"
 	defaultNameTemplate = "sandbox-%08x" // 8-char hex value (0-padded if shorter)
 )
+
+var defaultReqIdProducer ReqIdProducer = func() string {
+	return uuid.MustUUIDv4().String()
+}

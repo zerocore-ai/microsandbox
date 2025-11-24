@@ -5,7 +5,7 @@ import (
 	"log"
 	"time"
 
-	msb "github.com/keithang/microsandbox/sdk/go"
+	msb "github.com/microsandbox/microsandbox/sdk/go"
 )
 
 // basicMetricsExample demonstrates how to get individual metrics for a sandbox.
@@ -297,4 +297,3 @@ func main() {
 
 	fmt.Println("\nAll examples completed!")
 }
-
