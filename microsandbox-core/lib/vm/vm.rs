@@ -358,8 +358,26 @@ impl MicroVm {
                 }
             };
 
-            let host_path = CString::new(canonical_host_path.to_string_lossy().as_bytes()).unwrap();
-            tracing::debug!("canonical host path: {}", host_path.to_string_lossy());
+            // virtio-fs requires directories, not files. If the host path is a file,
+            // mount its parent directory instead.
+            let mount_path = if canonical_host_path.is_file() {
+                tracing::debug!(
+                    "host path is a file, mounting parent directory: {:?}",
+                    canonical_host_path.parent()
+                );
+                match canonical_host_path.parent() {
+                    Some(parent) => parent.to_path_buf(),
+                    None => {
+                        tracing::error!("file has no parent directory: {:?}", canonical_host_path);
+                        panic!("file has no parent directory: {:?}", canonical_host_path);
+                    }
+                }
+            } else {
+                canonical_host_path
+            };
+
+            let host_path = CString::new(mount_path.to_string_lossy().as_bytes()).unwrap();
+            tracing::debug!("mount path: {}", host_path.to_string_lossy());
 
             unsafe {
                 let status = ffi::krun_add_virtiofs(ctx_id, tag.as_ptr(), host_path.as_ptr());
@@ -929,6 +947,27 @@ mod tests {
             ))
         ));
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_validate_with_file_path_success() -> MicrosandboxResult<()> {
+        let temp_dir = TempDir::new()?;
+        let host_file = temp_dir.path().join("test_file.txt");
+        std::fs::write(&host_file, "test content")?;
+
+        // Test configuration with a file path should be valid
+        // Our fix should handle this by mounting the parent directory
+        let config = MicroVmConfig::builder()
+            .rootfs(Rootfs::Native(temp_dir.path().to_path_buf()))
+            .memory_mib(1024)
+            .exec_path("/bin/echo")
+            .mapped_dirs([
+                format!("{}:/app/test_file.txt", host_file.display()).parse()?,
+            ])
+            .build();
+
+        assert!(config.validate().is_ok());
         Ok(())
     }
 }
