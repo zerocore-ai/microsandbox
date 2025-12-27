@@ -30,7 +30,7 @@ Microsandbox makes it **easy** to run untrusted workloads within a **hardware-is
 Running untrusted code securely is hard. Traditional solutions—containers, VMs, or cloud sandboxes—each trade off speed, isolation, or control. Microsandbox aims to give the best of all worlds.
 
 > [!WARNING]
-> This project is still **experimental**. Expect breaking changes, missing features, and rough edges.
+> Microsandbox is still **experimental software**. Expect breaking changes, missing features, and rough edges.
 
 <br/>
 

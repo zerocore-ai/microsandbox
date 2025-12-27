@@ -11,9 +11,9 @@ use std::{
 
 use chrono::{DateTime, Utc};
 use microsandbox_utils::{
-    env, DEFAULT_MSBRUN_EXE_PATH, DEFAULT_SHELL, EXTRACTED_LAYER_SUFFIX, LAYERS_SUBDIR, LOG_SUBDIR,
+    DEFAULT_MSBRUN_EXE_PATH, DEFAULT_SHELL, EXTRACTED_LAYER_SUFFIX, LAYERS_SUBDIR, LOG_SUBDIR,
     MICROSANDBOX_CONFIG_FILENAME, MICROSANDBOX_ENV_DIR, MSBRUN_EXE_ENV_VAR, OCI_DB_FILENAME,
-    PATCH_SUBDIR, RW_SUBDIR, SANDBOX_DB_FILENAME, SANDBOX_DIR, SCRIPTS_DIR, SHELL_SCRIPT_NAME,
+    PATCH_SUBDIR, RW_SUBDIR, SANDBOX_DB_FILENAME, SANDBOX_DIR, SCRIPTS_DIR, SHELL_SCRIPT_NAME, env,
 };
 use sqlx::{Pool, Sqlite};
 use tempfile;
@@ -21,13 +21,13 @@ use tokio::{fs, process::Command};
 use typed_path::Utf8UnixPathBuf;
 
 use crate::{
+    MicrosandboxError, MicrosandboxResult,
     config::{
-        EnvPair, Microsandbox, PathPair, PortPair, ReferenceOrPath, Sandbox, START_SCRIPT_NAME,
+        EnvPair, Microsandbox, PathPair, PortPair, ReferenceOrPath, START_SCRIPT_NAME, Sandbox,
     },
     management::{config, db, image, menv, rootfs},
     oci::Reference,
     vm::Rootfs,
-    MicrosandboxError, MicrosandboxResult,
 };
 
 //--------------------------------------------------------------------------------------------------
@@ -542,9 +542,8 @@ async fn setup_image_rootfs(
     sandbox_pool: &Pool<Sqlite>,
     use_image_defaults: bool,
 ) -> MicrosandboxResult<Rootfs> {
-    // Pull the image from the registry
-    tracing::info!("pulling image: {}", image);
-    image::pull(image.clone(), true, None).await?;
+    tracing::info!(?image, "pulling image");
+    image::pull(image.clone(), None).await?;
 
     // Get the microsandbox home path and database path
     let microsandbox_home_path = env::get_microsandbox_home_path();
@@ -566,6 +565,7 @@ async fn setup_image_rootfs(
     tracing::info!("found {} layers for image {}", layers.len(), image);
 
     // Get the extracted layer paths
+    // TODO: Switch to using `LayerOps` trait
     let mut layer_paths = Vec::new();
     for layer in &layers {
         let layer_path = layers_dir.join(format!("{}.{}", layer.digest, EXTRACTED_LAYER_SUFFIX));

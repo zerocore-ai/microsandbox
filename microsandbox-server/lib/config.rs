@@ -18,7 +18,7 @@ use std::{
 };
 
 use getset::Getters;
-use microsandbox_utils::{env, NAMESPACES_SUBDIR};
+use microsandbox_utils::{NAMESPACES_SUBDIR, env};
 use serde::Deserialize;
 
 use crate::{MicrosandboxServerError, MicrosandboxServerResult};

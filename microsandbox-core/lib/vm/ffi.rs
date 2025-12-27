@@ -5,7 +5,7 @@ use std::ffi::c_char;
 //--------------------------------------------------------------------------------------------------
 
 #[link(name = "krun")]
-extern "C" {
+unsafe extern "C" {
     /// Sets the log level for the library.
     ///
     /// ## Arguments

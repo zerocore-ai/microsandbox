@@ -6,11 +6,12 @@ use microsandbox_utils::SupportedPathType;
 use typed_path::Utf8UnixPathBuf;
 
 use crate::{
+    InvalidMicroVMConfigError, MicrosandboxError, MicrosandboxResult,
     config::{EnvPair, NetworkScope, PathPair, PortPair},
-    utils, InvalidMicroVMConfigError, MicrosandboxError, MicrosandboxResult,
+    utils,
 };
 
-use super::{ffi, LinuxRlimit, MicroVmBuilder, MicroVmConfigBuilder};
+use super::{LinuxRlimit, MicroVmBuilder, MicroVmConfigBuilder, ffi};
 
 //--------------------------------------------------------------------------------------------------
 // Constants

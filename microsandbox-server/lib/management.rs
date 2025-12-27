@@ -19,10 +19,10 @@ use jsonwebtoken::{EncodingKey, Header};
 #[cfg(feature = "cli")]
 use microsandbox_utils::term;
 use microsandbox_utils::{
-    env, DEFAULT_MSBSERVER_EXE_PATH, MSBSERVER_EXE_ENV_VAR, NAMESPACES_SUBDIR, SERVER_KEY_FILE,
-    SERVER_PID_FILE,
+    DEFAULT_MSBSERVER_EXE_PATH, MSBSERVER_EXE_ENV_VAR, NAMESPACES_SUBDIR, SERVER_KEY_FILE,
+    SERVER_PID_FILE, env,
 };
-use rand::{distr::Alphanumeric, Rng};
+use rand::{Rng, distr::Alphanumeric};
 use serde::{Deserialize, Serialize};
 use tokio::{fs, process::Command};
 

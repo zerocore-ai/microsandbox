@@ -11,8 +11,8 @@
 //! - `apply`: Reconcile running sandboxes with configuration
 
 use crate::{
-    config::{Microsandbox, START_SCRIPT_NAME},
     MicrosandboxError, MicrosandboxResult,
+    config::{Microsandbox, START_SCRIPT_NAME},
 };
 
 #[cfg(feature = "cli")]

@@ -5,8 +5,8 @@ use microsandbox_utils::{DEFAULT_MEMORY_MIB, DEFAULT_NUM_VCPUS};
 use typed_path::Utf8UnixPathBuf;
 
 use crate::{
-    config::{EnvPair, NetworkScope, PathPair, PortPair},
     MicrosandboxResult,
+    config::{EnvPair, NetworkScope, PathPair, PortPair},
 };
 
 use super::{LinuxRlimit, LogLevel, MicroVm, MicroVmConfig, Rootfs};

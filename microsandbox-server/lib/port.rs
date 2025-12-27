@@ -230,7 +230,9 @@ impl PortManager {
                 return Ok(port);
             } else {
                 // Port is no longer available, so we need to assign a new one
-                warn!("Previously assigned port {} for sandbox {} is no longer available, reassigning", port, key);
+                warn!(
+                    "Previously assigned port {port} for sandbox {key} is no longer available, reassigning",
+                );
                 self.mappings.remove_by_sandbox(key);
             }
         }

@@ -80,12 +80,8 @@ async fn main() -> MicrosandboxCliResult<()> {
         }) => {
             handlers::list_subcommand(sandbox, build, file).await?;
         }
-        Some(MicrosandboxSubcommand::Pull {
-            image,
-            name,
-            layer_path,
-        }) => {
-            image::pull(name, image, layer_path).await?;
+        Some(MicrosandboxSubcommand::Pull { name, layer_path }) => {
+            image::pull(name, layer_path).await?;
         }
         Some(MicrosandboxSubcommand::Run {
             sandbox,

@@ -4,7 +4,7 @@ use std::{
     str::FromStr,
 };
 
-use crate::{oci::Reference, MicrosandboxError};
+use crate::{MicrosandboxError, oci::Reference};
 
 //--------------------------------------------------------------------------------------------------
 // Types
@@ -245,7 +245,7 @@ mod tests {
             ("alpine:latest", "docker.io/library/alpine:latest"),
             (
                 "registry.example.com/app:v1.0",
-                "registry.example.com/library/app:v1.0",
+                "registry.example.com/app:v1.0",
             ),
         ];
 

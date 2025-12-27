@@ -8,14 +8,15 @@
 use std::path::Path;
 
 use chrono::{DateTime, NaiveDateTime, Utc};
-use oci_spec::image::{ImageConfiguration, ImageIndex, ImageManifest, MediaType, Platform};
-use sqlx::{migrate::Migrator, sqlite::SqlitePoolOptions, Pool, Row, Sqlite};
+use oci_client::{config::ConfigFile, manifest::OciImageManifest};
+use oci_spec::image::MediaType;
+use sqlx::{Pool, Row, Sqlite, migrate::Migrator, sqlite::SqlitePoolOptions};
 use tokio::fs;
 
 use crate::{
-    models::{Config, Image, Index, Layer, Manifest, Sandbox},
-    runtime::SANDBOX_STATUS_RUNNING,
     MicrosandboxResult,
+    models::{Config, Image, Layer, Manifest, Sandbox},
+    runtime::SANDBOX_STATUS_RUNNING,
 };
 
 //--------------------------------------------------------------------------------------------------
@@ -337,76 +338,23 @@ pub(crate) async fn save_image(
     Ok(record.get::<i64, _>("id"))
 }
 
-/// Saves an image index to the database and returns its ID
-pub(crate) async fn save_index(
-    pool: &Pool<Sqlite>,
-    image_id: i64,
-    index: &ImageIndex,
-    platform: Option<&Platform>,
-) -> MicrosandboxResult<i64> {
-    let index_model = Index {
-        id: 0, // Will be set by the database
-        image_id,
-        schema_version: index.schema_version() as i64,
-        media_type: index
-            .media_type()
-            .as_ref()
-            .map(|mt| mt.to_string())
-            .unwrap_or_else(|| MediaType::ImageIndex.to_string()),
-        platform_os: platform.map(|p| p.os().to_string()),
-        platform_arch: platform.map(|p| p.architecture().to_string()),
-        platform_variant: platform.and_then(|p| p.variant().as_ref().map(|v| v.to_string())),
-        annotations_json: index
-            .annotations()
-            .as_ref()
-            .map(|a| serde_json::to_string(a).unwrap_or_default()),
-        created_at: Utc::now(),
-        modified_at: Utc::now(),
-    };
-
-    let record = sqlx::query(
-        r#"
-        INSERT INTO indexes (
-            image_id, schema_version, media_type,
-            platform_os, platform_arch, platform_variant,
-            annotations_json
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-        RETURNING id
-        "#,
-    )
-    .bind(index_model.image_id)
-    .bind(index_model.schema_version)
-    .bind(&index_model.media_type)
-    .bind(&index_model.platform_os)
-    .bind(&index_model.platform_arch)
-    .bind(&index_model.platform_variant)
-    .bind(&index_model.annotations_json)
-    .fetch_one(pool)
-    .await?;
-
-    Ok(record.get::<i64, _>("id"))
-}
-
 /// Saves an image manifest to the database and returns its ID
 pub(crate) async fn save_manifest(
     pool: &Pool<Sqlite>,
     image_id: i64,
-    index_id: Option<i64>,
-    manifest: &ImageManifest,
+    manifest: &OciImageManifest,
 ) -> MicrosandboxResult<i64> {
     let manifest_model = Manifest {
         id: 0, // Will be set by the database
-        index_id,
         image_id,
-        schema_version: manifest.schema_version() as i64,
+        schema_version: manifest.schema_version as i64,
         media_type: manifest
-            .media_type()
+            .media_type
             .as_ref()
             .map(|mt| mt.to_string())
             .unwrap_or_else(|| MediaType::ImageManifest.to_string()),
         annotations_json: manifest
-            .annotations()
+            .annotations
             .as_ref()
             .map(|a| serde_json::to_string(a).unwrap_or_default()),
         created_at: Utc::now(),
@@ -416,14 +364,13 @@ pub(crate) async fn save_manifest(
     let record = sqlx::query(
         r#"
         INSERT INTO manifests (
-            index_id, image_id, schema_version,
+            image_id, schema_version,
             media_type, annotations_json
         )
-        VALUES (?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?)
         RETURNING id
         "#,
     )
-    .bind(manifest_model.index_id)
     .bind(manifest_model.image_id)
     .bind(manifest_model.schema_version)
     .bind(&manifest_model.media_type)
@@ -438,52 +385,51 @@ pub(crate) async fn save_manifest(
 pub(crate) async fn save_config(
     pool: &Pool<Sqlite>,
     manifest_id: i64,
-    config: &ImageConfiguration,
+    config: &ConfigFile,
 ) -> MicrosandboxResult<i64> {
     let config_model = Config {
         id: 0, // Will be set by the database
         manifest_id,
         media_type: MediaType::ImageConfig.to_string(),
-        created: config
-            .created()
-            .as_ref()
-            .map(|dt| dt.parse::<DateTime<Utc>>().unwrap()),
-        architecture: config.architecture().to_string(),
-        os: config.os().to_string(),
-        os_variant: config.os_version().as_ref().map(|s| s.to_string()),
+        created: config.created.clone(),
+        architecture: config.architecture.to_string(),
+        os: config.os.to_string(),
+        // os_variant isn't in the formal spec, and is up to the implementer.
+        // Since we don't need it, we skip it for backward compatibility.
+        os_variant: None,
         config_env_json: config
-            .config()
+            .config
             .as_ref()
-            .map(|c| serde_json::to_string(c.env()).unwrap_or_default()),
+            .map(|c| serde_json::to_string(&c.env).unwrap_or_default()),
         config_cmd_json: config
-            .config()
+            .config
             .as_ref()
-            .map(|c| serde_json::to_string(c.cmd()).unwrap_or_default()),
+            .map(|c| serde_json::to_string(&c.cmd).unwrap_or_default()),
         config_working_dir: config
-            .config()
+            .config
             .as_ref()
-            .and_then(|c| c.working_dir().as_ref().map(String::from)),
+            .and_then(|c| c.working_dir.as_ref().map(String::from)),
         config_entrypoint_json: config
-            .config()
+            .config
             .as_ref()
-            .map(|c| serde_json::to_string(c.entrypoint()).unwrap_or_default()),
+            .map(|c| serde_json::to_string(&c.entrypoint).unwrap_or_default()),
         config_volumes_json: config
-            .config()
+            .config
             .as_ref()
-            .map(|c| serde_json::to_string(c.volumes()).unwrap_or_default()),
+            .map(|c| serde_json::to_string(&c.volumes).unwrap_or_default()),
         config_exposed_ports_json: config
-            .config()
+            .config
             .as_ref()
-            .map(|c| serde_json::to_string(c.exposed_ports()).unwrap_or_default()),
+            .map(|c| serde_json::to_string(&c.exposed_ports).unwrap_or_default()),
         config_user: config
-            .config()
+            .config
             .as_ref()
-            .and_then(|c| c.user().as_ref().map(String::from)),
-        rootfs_type: config.rootfs().typ().to_string(),
+            .and_then(|c| c.user.as_ref().map(String::from)),
+        rootfs_type: config.rootfs.r#type.to_string(),
         rootfs_diff_ids_json: Some(
-            serde_json::to_string(&config.rootfs().diff_ids()).unwrap_or_default(),
+            serde_json::to_string(&config.rootfs.diff_ids).unwrap_or_default(),
         ),
-        history_json: Some(serde_json::to_string(config.history()).unwrap_or_default()),
+        history_json: Some(serde_json::to_string(&config.history).unwrap_or_default()),
         created_at: Utc::now(),
         modified_at: Utc::now(),
     };
@@ -789,6 +735,20 @@ pub(crate) async fn save_or_update_image(
     }
 }
 
+/// Gets a layer from the database by its digest value.
+///
+/// ## Arguments
+///
+/// * `pool` - SQLite connection pool
+/// * `digest` - Layer digest string to search for
+pub(crate) async fn get_layer_by_digest(
+    pool: &Pool<Sqlite>,
+    digest: &str,
+) -> MicrosandboxResult<Option<Layer>> {
+    let mut layers = get_layers_by_digest(pool, &[digest.to_string()]).await?;
+    Ok(layers.pop())
+}
+
 /// Gets layers from the database by their digest values.
 ///
 /// This function retrieves layer information for a list of digest values without
@@ -955,10 +915,6 @@ mod tests {
         assert!(
             table_names.contains(&"images".to_string()),
             "images table not found"
-        );
-        assert!(
-            table_names.contains(&"indexes".to_string()),
-            "indexes table not found"
         );
         assert!(
             table_names.contains(&"manifests".to_string()),

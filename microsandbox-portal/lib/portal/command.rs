@@ -32,7 +32,7 @@ use tokio::{
         mpsc::{self, Sender},
         oneshot,
     },
-    time::{sleep, Duration},
+    time::{Duration, sleep},
 };
 use uuid::Uuid;
 

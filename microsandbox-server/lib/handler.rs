@@ -11,12 +11,12 @@
 //! - Response generation and error handling
 
 use axum::{
+    Json,
     body::Body,
     debug_handler,
     extract::{Path, State},
     http::{Request, StatusCode},
     response::{IntoResponse, Response},
-    Json,
 };
 use microsandbox_core::management::{menv, orchestra};
 use microsandbox_utils::{DEFAULT_CONFIG, DEFAULT_PORTAL_GUEST_PORT, MICROSANDBOX_CONFIG_FILENAME};
@@ -26,20 +26,20 @@ use serde_yaml;
 use std::path::PathBuf;
 use tokio::{
     fs as tokio_fs,
-    time::{sleep, timeout, Duration},
+    time::{Duration, sleep, timeout},
 };
 use tracing::{debug, trace, warn};
 
 use crate::{
+    SandboxStatus, SandboxStatusResponse, ServerResult,
     error::ServerError,
     mcp, middleware,
     payload::{
-        JsonRpcError, JsonRpcRequest, JsonRpcResponse, JsonRpcResponseOrNotification,
-        RegularMessageResponse, SandboxMetricsGetParams, SandboxStartParams, SandboxStopParams,
-        JSONRPC_VERSION,
+        JSONRPC_VERSION, JsonRpcError, JsonRpcRequest, JsonRpcResponse,
+        JsonRpcResponseOrNotification, RegularMessageResponse, SandboxMetricsGetParams,
+        SandboxStartParams, SandboxStopParams,
     },
     state::AppState,
-    SandboxStatus, SandboxStatusResponse, ServerResult,
 };
 
 //--------------------------------------------------------------------------------------------------

@@ -5,41 +5,38 @@
 //! handling image layers, and managing the local image cache.
 
 use crate::{
-    management::db::{self, OCI_DB_MIGRATOR},
-    oci::{DockerRegistry, Ghcr, OciRegistryPull, Reference},
     MicrosandboxError, MicrosandboxResult,
+    management::db::{self},
+    oci::{GlobalLayerCache, GlobalLayerOps, Reference, Registry},
 };
-#[cfg(feature = "cli")]
-use flate2::read::GzDecoder;
-use futures::future;
+use futures::{StreamExt, future};
 #[cfg(feature = "cli")]
 use indicatif::{ProgressBar, ProgressStyle};
 #[cfg(feature = "cli")]
 use microsandbox_utils::term::{self, MULTI_PROGRESS};
-use microsandbox_utils::{env, EXTRACTED_LAYER_SUFFIX, LAYERS_SUBDIR, OCI_DB_FILENAME};
+use microsandbox_utils::{EXTRACTED_LAYER_SUFFIX, LAYERS_SUBDIR, OCI_DB_FILENAME, env};
+use oci_spec::image::Platform;
+use pin_project_lite::pin_project;
 use sqlx::{Pool, Sqlite};
-use std::ffi::CStr;
-use std::io::Read;
-#[cfg(feature = "cli")]
-use std::io::Result as IoResult;
-use std::path::{Path, PathBuf};
-use tar::Archive;
+use std::{
+    ffi::{CStr, CString},
+    io::{self},
+    os::unix::fs::PermissionsExt,
+    path::{Path, PathBuf},
+    task::Poll,
+};
 use tempfile::tempdir;
-use tokio::fs;
 #[cfg(feature = "cli")]
-use tokio::task::spawn_blocking;
+use tokio::io::ReadBuf;
+use tokio::{
+    fs::{self},
+    io::AsyncRead,
+};
+use tokio_tar::Archive;
 
 //--------------------------------------------------------------------------------------------------
 // Constants
 //--------------------------------------------------------------------------------------------------
-
-/// The domain name for the Docker registry.
-const DOCKER_REGISTRY: &str = "docker.io";
-
-/// The domain name for the Sandboxes registry.
-const SANDBOXES_REGISTRY: &str = "sandboxes.io";
-
-const GITHUB_CONTAINER_REGISTRY: &str = "ghcr.io";
 
 #[cfg(feature = "cli")]
 /// Spinner message used for extracting layers.
@@ -100,124 +97,31 @@ const EXTRACT_LAYERS_MSG: &str = "Extracting layers";
 /// # Ok(())
 /// # }
 /// ```
-pub async fn pull(
-    name: Reference,
-    _image: bool,
-    layer_path: Option<PathBuf>,
-) -> MicrosandboxResult<()> {
-    // Single image pull mode (default if both flags are false, or if image is true)
-    let registry = name.to_string().split('/').next().unwrap_or("").to_string();
+pub async fn pull(image: Reference, layer_path: Option<PathBuf>) -> MicrosandboxResult<()> {
     let temp_download_dir = tempdir()?.into_path();
-
     tracing::info!(
         "temporary download directory: {}",
         temp_download_dir.display()
     );
 
-    if registry == DOCKER_REGISTRY {
-        pull_from_docker_registry(&name, &temp_download_dir, layer_path).await
-    } else if registry == SANDBOXES_REGISTRY {
-        pull_from_sandboxes_registry(&name, &temp_download_dir, layer_path).await
-    } else if registry == GITHUB_CONTAINER_REGISTRY {
-        pull_from_github_registry(&name, &temp_download_dir, layer_path).await
-    } else {
-        Err(MicrosandboxError::InvalidArgument(format!(
-            "Unsupported registry: {}",
-            registry
-        )))
-    }
-}
-
-/// Pulls a single image from the Github Container registry.
-///
-/// ## Arguments
-///
-/// * `image` - The reference to the Docker image to pull
-/// * `download_dir` - The directory to download the image layers to
-/// * `layer_path` - Optional custom path to store layers
-///
-/// ## Errors
-///
-/// Returns an error if:
-/// * Failed to create temporary directories
-/// * Failed to initialize Github Container registry client
-/// * Failed to pull the image from Github Container registry
-pub async fn pull_from_github_registry(
-    image: &Reference,
-    download_dir: impl AsRef<Path>,
-    layer_path: Option<PathBuf>,
-) -> Result<(), MicrosandboxError> {
-    let download_dir = download_dir.as_ref();
+    let layer = GlobalLayerCache::default();
     let microsandbox_home_path = env::get_microsandbox_home_path();
     let db_path = microsandbox_home_path.join(OCI_DB_FILENAME);
+    let db = db::get_or_create_pool(&db_path, &db::OCI_DB_MIGRATOR).await?;
+    let registry = Registry::new(temp_download_dir, db.clone(), Platform::default(), layer).await?;
 
     // Use custom layer_path if specified, otherwise use default microsandbox layers directory
-    let layers_dir = match layer_path {
-        Some(path) => path,
-        None => microsandbox_home_path.join(LAYERS_SUBDIR),
-    };
-
-    // Create layers directory if it doesn't exist
-    fs::create_dir_all(&layers_dir).await?;
-
-    let github_registry = Ghcr::new(download_dir, &db_path).await?;
-
-    // Get or create a connection pool to the database
-    let pool = db::get_or_create_pool(&db_path, &OCI_DB_MIGRATOR).await?;
-
-    // Check if we need to pull the image
-    if check_image_layers(&pool, image, &layers_dir).await? {
-        tracing::info!("image {} and all its layers exist, skipping pull", image);
-        return Ok(());
-    }
-
-    github_registry
-        .pull_image(image.get_repository(), image.get_selector().clone())
-        .await?;
-
-    // Find and extract layers in parallel
-    let layer_paths = collect_layer_files(download_dir).await?;
-
-    #[cfg(feature = "cli")]
-    let extract_layers_sp = term::create_spinner(
-        EXTRACT_LAYERS_MSG.to_string(),
-        None,
-        Some(layer_paths.len() as u64),
-    );
-
-    let extraction_futures: Vec<_> = layer_paths
-        .into_iter()
-        .map(|path| {
-            let layers_dir = layers_dir.clone();
-            #[cfg(feature = "cli")]
-            let extract_layers_sp = extract_layers_sp.clone();
-            async move {
-                let result = extract_layer(path, &layers_dir).await;
-                #[cfg(feature = "cli")]
-                extract_layers_sp.inc(1);
-                result
-            }
-        })
-        .collect();
-
-    // Wait for all extractions to complete
-    for result in future::join_all(extraction_futures).await {
-        result?;
-    }
-
-    #[cfg(feature = "cli")]
-    extract_layers_sp.finish();
-
-    Ok(())
+    let layers_dir = layer_path.unwrap_or_else(|| microsandbox_home_path.join(LAYERS_SUBDIR));
+    pull_image_and_extract(&registry, &db, &image, layers_dir).await
 }
 
-/// Pulls a single image from the Docker registry.
+/// Pulls a single image from the registry.
 ///
 /// ## Arguments
 ///
-/// * `image` - The reference to the Docker image to pull
+/// * `image` - The reference to the image to pull
 /// * `download_dir` - The directory to download the image layers to
-/// * `layer_path` - Optional custom path to store layers
+/// * `output_layers_dir` - The directory to store the pulled image layers
 ///
 /// ## Errors
 ///
@@ -225,41 +129,33 @@ pub async fn pull_from_github_registry(
 /// * Failed to create temporary directories
 /// * Failed to initialize Docker registry client
 /// * Failed to pull the image from Docker registry
-pub async fn pull_from_docker_registry(
+async fn pull_image_and_extract<L>(
+    registry: &Registry<L>,
+    pool: &Pool<Sqlite>,
     image: &Reference,
-    download_dir: impl AsRef<Path>,
-    layer_path: Option<PathBuf>,
-) -> MicrosandboxResult<()> {
-    let download_dir = download_dir.as_ref();
-    let microsandbox_home_path = env::get_microsandbox_home_path();
-    let db_path = microsandbox_home_path.join(OCI_DB_FILENAME);
-
-    // Use custom layer_path if specified, otherwise use default microsandbox layers directory
-    let layers_dir = match layer_path {
-        Some(path) => path,
-        None => microsandbox_home_path.join(LAYERS_SUBDIR),
-    };
-
+    output_layers_dir: PathBuf,
+) -> MicrosandboxResult<()>
+where
+    L: GlobalLayerOps + Send + Sync,
+{
     // Create layers directory if it doesn't exist
-    fs::create_dir_all(&layers_dir).await?;
-
-    let docker_registry = DockerRegistry::new(download_dir, &db_path).await?;
-
-    // Get or create a connection pool to the database
-    let pool = db::get_or_create_pool(&db_path, &OCI_DB_MIGRATOR).await?;
+    fs::create_dir_all(&output_layers_dir).await?;
 
     // Check if we need to pull the image
-    if check_image_layers(&pool, image, &layers_dir).await? {
+    if check_image_layers(&pool, image, &output_layers_dir).await? {
         tracing::info!("image {} and all its layers exist, skipping pull", image);
         return Ok(());
     }
 
-    docker_registry
-        .pull_image(image.get_repository(), image.get_selector().clone())
-        .await?;
-
-    // Find and extract layers in parallel
-    let layer_paths = collect_layer_files(download_dir).await?;
+    // filter out only downloaded layers so that we can extract them
+    // if a layer already exists in the global layer directory, it will be skipped
+    // since it should be already extracted
+    let layer_paths = registry
+        .pull_image(image)
+        .await?
+        .into_iter()
+        .filter_map(|layer| layer.download_path())
+        .collect::<Vec<_>>();
 
     #[cfg(feature = "cli")]
     let extract_layers_sp = term::create_spinner(
@@ -271,7 +167,7 @@ pub async fn pull_from_docker_registry(
     let extraction_futures: Vec<_> = layer_paths
         .into_iter()
         .map(|path| {
-            let layers_dir = layers_dir.clone();
+            let layers_dir = output_layers_dir.clone();
             #[cfg(feature = "cli")]
             let extract_layers_sp = extract_layers_sp.clone();
             async move {
@@ -292,75 +188,6 @@ pub async fn pull_from_docker_registry(
     extract_layers_sp.finish();
 
     Ok(())
-}
-
-/// Pulls a single image from the Sandboxes.io registry.
-///
-/// For library repository images, this function delegates to `pull_from_docker_registry` for compatibility.
-/// For other namespaces, it also uses Docker registry but displays a warning about potential future changes.
-///
-/// ## Arguments
-///
-/// * `image` - The reference to the Sandboxes.io image to pull
-/// * `download_dir` - The directory to download the image layers to
-/// * `layer_path` - Optional custom path to store layers
-///
-/// ## Errors
-///
-/// Returns an error if the underlying Docker registry pull fails
-pub async fn pull_from_sandboxes_registry(
-    image: &Reference,
-    download_dir: impl AsRef<Path>,
-    layer_path: Option<PathBuf>,
-) -> MicrosandboxResult<()> {
-    // Check if this is a library repository image
-    let repository = image.get_repository();
-
-    // Create a Docker reference string using the original repository but with docker.io registry
-    // Format: docker.io/repository:tag
-    let docker_ref_str = format!(
-        "{}/{}",
-        DOCKER_REGISTRY,
-        image
-            .to_string()
-            .split('/')
-            .skip(1)
-            .collect::<Vec<&str>>()
-            .join("/")
-    );
-    let docker_reference: Reference = docker_ref_str.parse()?;
-
-    if repository.starts_with("library/") {
-        tracing::info!("pulling library image from Docker registry for compatibility");
-    } else {
-        tracing::warn!(
-            "Non-library namespace image requested from Sandboxes registry: {}",
-            repository
-        );
-        tracing::warn!(
-            "Currently using Docker registry for compatibility, but namespace mappings may change in the future"
-        );
-        tracing::info!(
-            "To ensure consistent behavior, consider setting OCI_REGISTRY_DOMAIN=docker.io if you want to use Docker registry consistently"
-        );
-    }
-
-    pull_from_docker_registry(&docker_reference, download_dir, layer_path).await
-}
-
-/// Pulls an image group from the Sandboxes.io registry.
-///
-/// ## Arguments
-///
-/// * `group` - The reference to the image group to pull
-/// ## Errors
-///
-/// Returns an error if:
-/// * Sandboxes registry image group pull is not implemented
-pub async fn pull_group_from_sandboxes_registry(_group: &Reference) -> MicrosandboxResult<()> {
-    return Err(MicrosandboxError::NotImplemented(
-        "Sandboxes registry image group pull is not implemented".to_string(),
-    ));
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -449,7 +276,7 @@ async fn check_image_layers(
 }
 
 /// Helper function to get full mode with file type bits
-fn get_full_mode(entry_type: &tar::EntryType, permission_bits: u32) -> u32 {
+fn get_full_mode(entry_type: &tokio_tar::EntryType, permission_bits: u32) -> u32 {
     let file_type_bits = if entry_type.is_file() {
         libc::S_IFREG as u32
     } else if entry_type.is_dir() {
@@ -528,13 +355,13 @@ fn set_stat_xattr(
 /// Extracts a layer from the downloaded tar.gz file into an extracted directory.
 /// The extracted directory will be named as <layer-name>.extracted
 /// Custom extraction function that modifies file ownership during extraction
-fn extract_tar_with_ownership_override<R: Read>(
+async fn extract_tar_with_ownership_override<R>(
     archive: &mut Archive<R>,
     extract_dir: &Path,
-) -> MicrosandboxResult<()> {
-    use std::ffi::CString;
-    use std::os::unix::fs::PermissionsExt;
-
+) -> MicrosandboxResult<()>
+where
+    R: AsyncRead + Unpin,
+{
     // Cache the xattr name to avoid repeated allocations
     let xattr_name = CString::new("user.containers.override_stat")
         .map_err(|e| MicrosandboxError::LayerExtraction(format!("Invalid attr name: {:?}", e)))?;
@@ -550,13 +377,15 @@ fn extract_tar_with_ownership_override<R: Read>(
 
     // Store hard links to process after all regular files are extracted
     let mut hard_links = Vec::new();
+    let mut entries = archive.entries()?;
 
-    for entry in archive.entries()? {
+    while let Some(entry) = entries.next().await {
         let mut entry =
             entry.map_err(|e| MicrosandboxError::LayerExtraction(format!("{:?}", e)))?;
         let path = entry
             .path()
-            .map_err(|e| MicrosandboxError::LayerExtraction(format!("{:?}", e)))?;
+            .map_err(|e| MicrosandboxError::LayerExtraction(format!("{:?}", e)))?
+            .to_path_buf();
         let full_path = extract_dir.join(&path);
 
         // Get the original metadata from the tar entry
@@ -577,7 +406,7 @@ fn extract_tar_with_ownership_override<R: Read>(
             if let Ok(Some(link_name)) = entry.link_name() {
                 hard_links.push(HardLinkInfo {
                     link_path: full_path.clone(),
-                    target_path: extract_dir.join(&link_name),
+                    target_path: extract_dir.join(link_name.as_ref()),
                     uid: original_uid,
                     gid: original_gid,
                     mode: original_mode,
@@ -589,6 +418,7 @@ fn extract_tar_with_ownership_override<R: Read>(
         // Extract the entry (regular files, directories, symlinks)
         entry
             .unpack(&full_path)
+            .await
             .map_err(|e| MicrosandboxError::LayerExtraction(format!("{:?}", e)))?;
 
         // Skip all operations for symlinks
@@ -771,20 +601,33 @@ async fn extract_layer(
         extract_dir.display()
     );
 
-    #[cfg(feature = "cli")]
-    struct ProgressReader<R> {
-        inner: R,
-        bar: ProgressBar,
+    pin_project! {
+        #[cfg(feature = "cli")]
+        struct ProgressReader<R> {
+            #[pin]
+            inner: R,
+            bar: ProgressBar,
+        }
     }
 
     #[cfg(feature = "cli")]
-    impl<R: Read> Read for ProgressReader<R> {
-        fn read(&mut self, buf: &mut [u8]) -> IoResult<usize> {
-            let n = self.inner.read(buf)?;
-            if n > 0 {
-                self.bar.inc(n as u64);
+    impl<R: AsyncRead> AsyncRead for ProgressReader<R> {
+        fn poll_read(
+            self: std::pin::Pin<&mut Self>,
+            cx: &mut std::task::Context<'_>,
+            buf: &mut ReadBuf<'_>,
+        ) -> Poll<io::Result<()>> {
+            let p = self.project();
+            match p.inner.poll_read(cx, buf)? {
+                Poll::Ready(()) => {
+                    let n = buf.filled().len();
+                    if n > 0 {
+                        p.bar.inc(n as u64);
+                    }
+                    Poll::Ready(Ok(()))
+                }
+                Poll::Pending => Poll::Pending,
             }
-            Ok(n)
         }
     }
 
@@ -810,19 +653,21 @@ async fn extract_layer(
         let extract_dir_clone = extract_dir.clone();
         let pb_clone = pb.clone();
 
-        spawn_blocking(move || -> MicrosandboxResult<()> {
-            let file = std::fs::File::open(&layer_path_clone)?;
-            let reader = ProgressReader {
-                inner: file,
-                bar: pb_clone.clone(),
-            };
-            let decoder = GzDecoder::new(reader);
-            let mut archive = Archive::new(decoder);
-            extract_tar_with_ownership_override(&mut archive, &extract_dir_clone)?;
-            Ok(())
-        })
-        .await
-        .map_err(|e| MicrosandboxError::LayerExtraction(format!("{:?}", e)))??;
+        use async_compression::tokio::bufread::GzipDecoder;
+        use tokio::io::BufReader;
+        use tokio_tar::Archive;
+
+        let file = tokio::fs::File::open(&layer_path_clone).await?;
+        let reader = ProgressReader {
+            inner: file,
+            bar: pb_clone.clone(),
+        };
+
+        let decoder = GzipDecoder::new(BufReader::new(reader));
+        let mut archive = Archive::new(decoder);
+        extract_tar_with_ownership_override(&mut archive, &extract_dir_clone)
+            .await
+            .map_err(|e| MicrosandboxError::LayerExtraction(format!("{:?}", e)))?;
 
         pb.finish_and_clear();
     }
@@ -847,165 +692,4 @@ async fn extract_layer(
         extract_dir.display()
     );
     Ok(())
-}
-
-/// Collects all layer files in the given directory that start with "sha256:".
-async fn collect_layer_files(dir: impl AsRef<Path>) -> MicrosandboxResult<Vec<PathBuf>> {
-    let mut layer_paths = Vec::new();
-    let mut read_dir = fs::read_dir(dir).await?;
-
-    while let Ok(Some(entry)) = read_dir.next_entry().await {
-        let path = entry.path();
-        if path.is_file() {
-            if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
-                if file_name.starts_with("sha256:") {
-                    layer_paths.push(path.clone());
-                }
-            }
-        }
-    }
-
-    tracing::info!("found {} layers to extract", layer_paths.len());
-    Ok(layer_paths)
-}
-
-//--------------------------------------------------------------------------------------------------
-// Tests
-//--------------------------------------------------------------------------------------------------
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use tempfile::TempDir;
-
-    #[test_log::test(tokio::test)]
-    #[ignore = "makes network requests to Docker registry to pull an image"]
-    async fn test_image_pull_from_docker_registry() -> MicrosandboxResult<()> {
-        // Create temporary directories for test
-        let temp_dir = TempDir::new()?;
-        let microsandbox_home = temp_dir.path().join("microsandbox_home");
-        let download_dir = temp_dir.path().join("download");
-        fs::create_dir_all(&microsandbox_home).await?;
-        fs::create_dir_all(&download_dir).await?;
-
-        // Set up test environment
-        std::env::set_var("MICROSANDBOX_HOME", microsandbox_home.to_str().unwrap());
-
-        // Create test image reference (using a small image for faster tests)
-        let image_ref: Reference = "docker.io/library/nginx:stable-alpine".parse().unwrap();
-
-        // Call the function under test
-        pull_from_docker_registry(&image_ref, &download_dir, None).await?;
-
-        // Initialize database connection for verification
-        let db_path = microsandbox_home.join(OCI_DB_FILENAME);
-        let pool = db::get_or_create_pool(&db_path, &OCI_DB_MIGRATOR).await?;
-
-        // Verify image exists in database
-        let image_exists = db::image_exists(&pool, &image_ref.to_string()).await?;
-        assert!(image_exists, "Image should exist in database");
-
-        // Verify layers directory exists and contains extracted layers
-        let layers_dir = microsandbox_home.join(LAYERS_SUBDIR);
-        assert!(layers_dir.exists(), "Layers directory should exist");
-
-        // Verify extracted layer directories exist
-        let mut entries = fs::read_dir(&layers_dir).await?;
-        let mut found_extracted_layers = false;
-        while let Some(entry) = entries.next_entry().await? {
-            if entry
-                .file_name()
-                .to_string_lossy()
-                .ends_with(EXTRACTED_LAYER_SUFFIX)
-            {
-                found_extracted_layers = true;
-                assert!(
-                    entry.path().is_dir(),
-                    "Extracted layer path should be a directory"
-                );
-            }
-        }
-        assert!(
-            found_extracted_layers,
-            "Should have found extracted layer directories"
-        );
-
-        // Verify nginx files exist in the extracted layers
-        helper::verify_nginx_files(&layers_dir).await?;
-
-        Ok(())
-    }
-}
-
-#[cfg(test)]
-mod helper {
-    use super::*;
-
-    /// Helper function to verify that all expected nginx files exist in the extracted layers
-    pub(super) async fn verify_nginx_files(layers_dir: impl AsRef<Path>) -> MicrosandboxResult<()> {
-        let mut found_nginx_conf = false;
-        let mut found_default_conf = false;
-        let mut found_nginx_binary = false;
-
-        // Check each extracted layer directory for nginx files
-        let mut entries = fs::read_dir(layers_dir).await?;
-        while let Some(entry) = entries.next_entry().await? {
-            if !entry
-                .file_name()
-                .to_string_lossy()
-                .ends_with(EXTRACTED_LAYER_SUFFIX)
-            {
-                continue;
-            }
-
-            let layer_path = entry.path();
-            tracing::info!("checking layer: {}", layer_path.display());
-
-            // Check for nginx.conf
-            let nginx_conf = layer_path.join("etc").join("nginx").join("nginx.conf");
-            if nginx_conf.exists() {
-                found_nginx_conf = true;
-                tracing::info!("found nginx.conf at {}", nginx_conf.display());
-            }
-
-            // Check for default.conf
-            let default_conf = layer_path
-                .join("etc")
-                .join("nginx")
-                .join("conf.d")
-                .join("default.conf");
-            if default_conf.exists() {
-                found_default_conf = true;
-                tracing::info!("found default.conf at {}", default_conf.display());
-            }
-
-            // Check for nginx binary
-            let nginx_binary = layer_path.join("usr").join("sbin").join("nginx");
-            if nginx_binary.exists() {
-                found_nginx_binary = true;
-                tracing::info!("found nginx binary at {}", nginx_binary.display());
-            }
-
-            // If we found all files, we can stop checking
-            if found_nginx_conf && found_default_conf && found_nginx_binary {
-                break;
-            }
-        }
-
-        // Assert that we found all the expected files
-        assert!(
-            found_nginx_conf,
-            "nginx.conf should exist in one of the layers"
-        );
-        assert!(
-            found_default_conf,
-            "default.conf should exist in one of the layers"
-        );
-        assert!(
-            found_nginx_binary,
-            "nginx binary should exist in one of the layers"
-        );
-
-        Ok(())
-    }
 }

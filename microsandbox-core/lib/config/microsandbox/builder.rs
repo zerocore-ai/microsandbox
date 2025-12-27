@@ -5,8 +5,8 @@ use semver::Version;
 use typed_path::Utf8UnixPathBuf;
 
 use crate::{
-    config::{EnvPair, PathPair, PortPair, ReferenceOrPath},
     MicrosandboxResult,
+    config::{EnvPair, PathPair, PortPair, ReferenceOrPath},
 };
 
 use super::{Build, Meta, Microsandbox, Module, NetworkScope, Sandbox};

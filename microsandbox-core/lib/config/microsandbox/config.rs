@@ -13,8 +13,8 @@ use typed_builder::TypedBuilder;
 use typed_path::Utf8UnixPathBuf;
 
 use crate::{
-    config::{EnvPair, PathPair, PortPair, ReferenceOrPath},
     MicrosandboxError, MicrosandboxResult,
+    config::{EnvPair, PathPair, PortPair, ReferenceOrPath},
 };
 
 use super::{MicrosandboxBuilder, SandboxBuilder};

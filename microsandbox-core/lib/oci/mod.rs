@@ -5,14 +5,18 @@
 //! - Parsing and validating image references (tags and digests)
 //! - Managing image manifests, configurations, and layers
 
-mod implementations;
-mod pull;
+mod layer;
+#[cfg(test)]
+pub(crate) mod mocks;
 mod reference;
+mod registry;
+#[cfg(test)]
+mod tests;
 
 //--------------------------------------------------------------------------------------------------
 // Exports
 //--------------------------------------------------------------------------------------------------
 
-pub use implementations::*;
-pub use pull::*;
+pub(crate) use layer::*;
 pub use reference::*;
+pub(crate) use registry::*;

@@ -2,12 +2,12 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use axum::http::{
-    header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE},
     Method,
+    header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE},
 };
 use clap::Parser;
 use microsandbox_cli::{MicrosandboxCliResult, MsbserverArgs};
-use microsandbox_server::{port::PortManager, route, state::AppState, Config};
+use microsandbox_server::{Config, port::PortManager, route, state::AppState};
 use microsandbox_utils::CHECKMARK;
 use tower_http::cors::{Any, CorsLayer};
 
