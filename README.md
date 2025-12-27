@@ -30,7 +30,11 @@ Microsandbox makes it **easy** to run untrusted workloads within a **hardware-is
 Running untrusted code securely is hard. Traditional solutions—containers, VMs, or cloud sandboxes—each trade off speed, isolation, or control. Microsandbox aims to give the best of all worlds.
 
 > [!WARNING]
+<<<<<<< Updated upstream
 > This project is still **experimental**. Expect breaking changes, missing features, and rough edges.
+=======
+> Microsandbox is still **experimental software**. Expect breaking changes, missing features, and rough edges.
+>>>>>>> Stashed changes
 
 <br/>
 
@@ -253,6 +257,8 @@ msr app # or `msb run --sandbox app`
 
 <br/>
 
+<<<<<<< Updated upstream
+
 ## <img height="18" src="https://octicons-col.vercel.app/light-bulb/A770EF">&nbsp;&nbsp;Uninstall
 
 To uninstall microsandbox, run: `msb self uninstall`. Use the `--force` flag. This removes the `$HOME/.microsandbox` directory and all its content, effectively cleaning up all cached microsandbox data such as images, layers, and databases.
@@ -272,6 +278,22 @@ Wondering how you can use `microsandbox` in your next project, see our sample [u
 Interested in contributing to `microsandbox`? Check out our [Development Guide](./DEVELOPMENT.md) for instructions on setting up your development environment, building the project, running tests, and creating releases. For contribution guidelines, please refer to [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 <br/>
+
+=======
+
+## <img height="18" src="https://octicons-col.vercel.app/light-bulb/A770EF">&nbsp;&nbsp;Use Cases
+
+Wondering how you can use `microsandbox` in your next project, see our sample [use cases](./USE_CASE.md).
+
+<br/>
+
+## <img height="18" src="https://octicons-col.vercel.app/gear/A770EF">&nbsp;&nbsp;Contributing
+
+Interested in contributing to `microsandbox`? Check out our [Development Guide](./DEVELOPMENT.md) for instructions on setting up your development environment, building the project, running tests, and creating releases. For contribution guidelines, please refer to [CONTRIBUTING.md](./CONTRIBUTING.md).
+
+<br/>
+
+> > > > > > > Stashed changes
 
 ## <img height="18" src="https://octicons-col.vercel.app/law/A770EF">&nbsp;&nbsp;License
 

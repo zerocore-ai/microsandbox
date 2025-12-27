@@ -11,7 +11,7 @@ use tokio::{net::TcpListener, signal};
 use tracing;
 
 use microsandbox_portal::{
-    portal::repl::{start_engines, EngineHandle},
+    portal::repl::{EngineHandle, start_engines},
     route::create_router,
     state::SharedState,
 };

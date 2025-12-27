@@ -1,4 +1,4 @@
-use clap::{error::ErrorKind, CommandFactory};
+use clap::{CommandFactory, error::ErrorKind};
 use microsandbox_cli::{
     AnsiStyles, MicrosandboxArgs, MicrosandboxCliError, MicrosandboxCliResult, SelfAction,
 };
@@ -11,7 +11,7 @@ use microsandbox_core::{
     oci::Reference,
 };
 use microsandbox_server::MicrosandboxServerResult;
-use microsandbox_utils::{env, NAMESPACES_SUBDIR};
+use microsandbox_utils::{NAMESPACES_SUBDIR, env};
 use std::{collections::HashMap, path::PathBuf};
 use typed_path::Utf8UnixPathBuf;
 
@@ -43,7 +43,7 @@ pub fn log_level(args: &MicrosandboxArgs) {
 
     // Set RUST_LOG environment variable only if a level is specified
     if let Some(level) = level {
-        std::env::set_var("RUST_LOG", format!("microsandbox={},msb={}", level, level));
+        unsafe { std::env::set_var("RUST_LOG", format!("microsandbox={},msb={}", level, level)) };
     }
 }
 
@@ -504,7 +504,9 @@ pub async fn install_subcommand(
 
     // If extra args are provided, show a warning as they will be ignored during install
     if !args.is_empty() {
-        tracing::warn!("Extra arguments will be ignored during install. They will be passed to the sandbox when the alias is used.");
+        tracing::warn!(
+            "Extra arguments will be ignored during install. They will be passed to the sandbox when the alias is used."
+        );
     }
 
     home::install(

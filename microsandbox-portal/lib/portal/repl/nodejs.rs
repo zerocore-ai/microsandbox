@@ -10,7 +10,7 @@
 //! and prompts for cleaner output handling.
 
 use async_trait::async_trait;
-use rand::{distr::Alphanumeric, Rng};
+use rand::{Rng, distr::Alphanumeric};
 use std::sync::{Arc, Mutex};
 use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
@@ -19,7 +19,7 @@ use tokio::{
         mpsc::{self, Sender},
         oneshot,
     },
-    time::{sleep, timeout as tokio_timeout, Duration},
+    time::{Duration, sleep, timeout as tokio_timeout},
 };
 
 use super::types::{Engine, EngineError, Resp, Stream};

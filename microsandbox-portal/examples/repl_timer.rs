@@ -48,9 +48,9 @@
 //! [Stderr] Execution timed out after 10 seconds
 //! ```
 
-use microsandbox_portal::portal::repl::start_engines;
 #[cfg(any(feature = "python", feature = "nodejs"))]
 use microsandbox_portal::portal::repl::Language;
+use microsandbox_portal::portal::repl::start_engines;
 use std::error::Error;
 
 /// Fixed timeout duration for all executions in this example

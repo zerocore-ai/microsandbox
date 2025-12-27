@@ -88,26 +88,26 @@ _build_aliases:
 $(MSB_BIN): build_libkrun
 	cd microsandbox-core
 ifeq ($(OS),Darwin)
-	RUSTFLAGS="-C link-args=-Wl,-rpath,@executable_path/../lib,-rpath,@executable_path" cargo build $(CARGO_BUILD_MODE) --bin msb --features cli $(FEATURES)
+	cargo build $(CARGO_BUILD_MODE) --bin msb --features cli $(FEATURES)
 else
-	RUSTFLAGS="-C link-args=-Wl,-rpath,\$$ORIGIN/../lib,-rpath,\$$ORIGIN" cargo build $(CARGO_BUILD_MODE) --bin msb --features cli $(FEATURES)
+	cargo build $(CARGO_BUILD_MODE) --bin msb --features cli $(FEATURES)
 endif
 
 $(MSBRUN_BIN): build_libkrun
 	cd microsandbox-core
 ifeq ($(OS),Darwin)
-	RUSTFLAGS="-C link-args=-Wl,-rpath,@executable_path/../lib,-rpath,@executable_path" cargo build $(CARGO_BUILD_MODE) --bin msbrun --features cli $(FEATURES)
+	cargo build $(CARGO_BUILD_MODE) --bin msbrun --features cli $(FEATURES)
 	codesign --entitlements microsandbox.entitlements --force -s - $@
 else
-	RUSTFLAGS="-C link-args=-Wl,-rpath,\$$ORIGIN/../lib,-rpath,\$$ORIGIN" cargo build $(CARGO_BUILD_MODE) --bin msbrun --features cli $(FEATURES)
+	cargo build $(CARGO_BUILD_MODE) --bin msbrun --features cli $(FEATURES)
 endif
 
 $(MSBSERVER_BIN): build_libkrun
 	cd microsandbox-core
 ifeq ($(OS),Darwin)
-	RUSTFLAGS="-C link-args=-Wl,-rpath,@executable_path/../lib,-rpath,@executable_path" cargo build $(CARGO_BUILD_MODE) --bin msbserver --features cli $(FEATURES)
+	cargo build $(CARGO_BUILD_MODE) --bin msbserver --features cli $(FEATURES)
 else
-	RUSTFLAGS="-C link-args=-Wl,-rpath,\$$ORIGIN/../lib,-rpath,\$$ORIGIN" cargo build $(CARGO_BUILD_MODE) --bin msbserver --features cli $(FEATURES)
+	cargo build $(CARGO_BUILD_MODE) --bin msbserver --features cli $(FEATURES)
 endif
 
 # -----------------------------------------------------------------------------
@@ -161,7 +161,7 @@ uninstall:
 	fi
 
 build_libkrun:
-	./scripts/build_libkrun.sh --no-clean
+	./scripts/build_libkrun.sh --no-clean --build-dir "$(BUILD_DIR)"
 
 # Catch-all target to allow example names and arguments
 %:

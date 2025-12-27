@@ -1,4 +1,5 @@
 use microsandbox_utils::MicrosandboxUtilsError;
+use oci_client::errors::OciDistributionError;
 use sqlx::migrate::MigrateError;
 use std::{
     error::Error,
@@ -7,8 +8,6 @@ use std::{
     time::SystemTimeError,
 };
 use thiserror::Error;
-
-use crate::oci::{DockerRegistryResponseError, GhcrRegistryResponseError};
 
 //--------------------------------------------------------------------------------------------------
 // Types
@@ -26,11 +25,11 @@ pub enum MicrosandboxError {
 
     /// An error that can represent any error.
     #[error(transparent)]
-    Custom(#[from] AnyError),
+    AnyError(#[from] anyhow::Error),
 
     /// An error that occurred during an OCI distribution operation.
     #[error("oci distribution error: {0}")]
-    OciDistribution(#[from] anyhow::Error),
+    OciDistribution(#[from] OciDistributionError),
 
     /// An error that occurred during an HTTP request.
     #[error("http request error: {0}")]
@@ -244,22 +243,6 @@ pub enum MicrosandboxError {
     #[error("migration error: {0}")]
     MigrationError(#[from] MigrateError),
 
-    /// An error that occurred when a Docker registry response error occurred
-    #[error("docker registry response error: {0}")]
-    DockerRegistryResponseError(#[from] DockerRegistryResponseError),
-
-    /// An error that occurred when a Github registry response error occurred
-    #[error("{0}")]
-    GhcrRegistryResponseError(#[from] GhcrRegistryResponseError),
-
-    /// An error that occurred when parsing an image reference selector with an invalid format
-    #[error("invalid image reference    selector format: {0}")]
-    InvalidReferenceSelectorFormat(String),
-
-    /// An error that occurred when parsing an invalid digest in an image reference selector
-    #[error("invalid image reference selector digest: {0}")]
-    InvalidReferenceSelectorDigest(String),
-
     /// An error that occurred when a feature is not yet implemented
     #[error("feature not yet implemented: {0}")]
     NotImplemented(String),
@@ -303,6 +286,14 @@ pub enum MicrosandboxError {
     /// An error that occurred when a command was not found.
     #[error("command not found: {0}")]
     CommandNotFound(String),
+
+    /// An error that occurred when failed to parse OCI spec
+    #[error("failed to parse OCI spec: {0}")]
+    SpecError(#[from] oci_spec::OciSpecError),
+
+    /// An error that occurred when failed to parse OCI reference
+    #[error("failed to parse OCI reference: {0}")]
+    ParseError(#[from] oci_client::ParseError),
 }
 
 /// An error that occurred when an invalid MicroVm configuration was used.
@@ -325,7 +316,9 @@ pub enum InvalidMicroVMConfigError {
     MemoryIsZero,
 
     /// The command line contains invalid characters. Only printable ASCII characters (space through tilde) are allowed.
-    #[error("command line contains invalid characters (only ASCII characters between space and tilde are allowed): {0}")]
+    #[error(
+        "command line contains invalid characters (only ASCII characters between space and tilde are allowed): {0}"
+    )]
     InvalidCommandLineString(String),
 
     /// An error that occurs when conflicting guest paths are detected.
@@ -342,15 +335,6 @@ pub struct AnyError {
 //--------------------------------------------------------------------------------------------------
 // Methods
 //--------------------------------------------------------------------------------------------------
-
-impl MicrosandboxError {
-    /// Creates a new `Err` result.
-    pub fn custom(error: impl Into<anyhow::Error>) -> MicrosandboxError {
-        MicrosandboxError::Custom(AnyError {
-            error: error.into(),
-        })
-    }
-}
 
 impl AnyError {
     /// Downcasts the error to a `T`.

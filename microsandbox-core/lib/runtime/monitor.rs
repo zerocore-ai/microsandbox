@@ -7,13 +7,13 @@ use std::{
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use microsandbox_utils::{
-    ChildIo, MicrosandboxUtilsError, MicrosandboxUtilsResult, ProcessMonitor, RotatingLog,
-    LOG_SUFFIX,
+    ChildIo, LOG_SUFFIX, MicrosandboxUtilsError, MicrosandboxUtilsResult, ProcessMonitor,
+    RotatingLog,
 };
 use sqlx::{Pool, Sqlite};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-use crate::{management::db, vm::Rootfs, MicrosandboxResult};
+use crate::{MicrosandboxResult, management::db, vm::Rootfs};
 
 //--------------------------------------------------------------------------------------------------
 // Constants

@@ -16,9 +16,9 @@ use tokio::sync::RwLock;
 use getset::Getters;
 
 use crate::{
-    config::Config,
-    port::{PortManager, LOCALHOST_IP},
     ServerError, ServerResult,
+    config::Config,
+    port::{LOCALHOST_IP, PortManager},
 };
 
 //--------------------------------------------------------------------------------------------------

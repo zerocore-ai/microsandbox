@@ -509,10 +509,6 @@ pub enum MicrosandboxSubcommand {
     /// Pull image from a registry
     #[command(name = "pull")]
     Pull {
-        /// Whether command should apply to an image
-        #[arg(short, long)]
-        image: bool,
-
         /// Name of the image
         #[arg(required = true)]
         name: Reference,

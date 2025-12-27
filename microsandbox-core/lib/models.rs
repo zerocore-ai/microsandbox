@@ -106,9 +106,6 @@ pub struct Manifest {
     /// Unique identifier for the manifest
     pub id: i64,
 
-    /// Optional ID of the index this manifest belongs to
-    pub index_id: Option<i64>,
-
     /// ID of the image this manifest belongs to
     pub image_id: i64,
 

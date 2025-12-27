@@ -335,11 +335,13 @@ mod helper {
 
     /// Helper function to set up a non-interactive terminal environment
     pub(super) fn setup_non_interactive() {
-        env::set_var("TERM", "dumb");
+        // Safety: this is used solely for tests
+        unsafe { env::set_var("TERM", "dumb") };
     }
 
     /// Helper function to set up an interactive terminal environment
     pub(super) fn setup_interactive() {
-        env::set_var("TERM", "xterm-256color");
+        // Safety: this is used solely for tests
+        unsafe { env::set_var("TERM", "xterm-256color") };
     }
 }

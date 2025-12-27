@@ -12,21 +12,21 @@
 //! - Logging and tracing middleware
 
 use axum::{
-    body::{to_bytes, Body},
+    body::{Body, to_bytes},
     extract::State,
     http::{HeaderMap, Request, StatusCode, Uri},
     middleware::Next,
     response::IntoResponse,
 };
-use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
+use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode};
 use serde_json::Value;
 
 use crate::{
+    Claims,
     config::PROXY_AUTH_HEADER,
     error::{AuthenticationError, ServerError, ValidationError},
     management::API_KEY_PREFIX,
     state::AppState,
-    Claims,
 };
 
 //--------------------------------------------------------------------------------------------------

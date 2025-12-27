@@ -11,9 +11,8 @@
 //! - State management for routes
 
 use axum::{
-    middleware,
+    Router, middleware,
     routing::{get, post},
-    Router,
 };
 
 use crate::{handler, middleware as app_middleware, state::AppState};

@@ -14,13 +14,13 @@ use std::{
     path::{Path, PathBuf},
     pin::Pin,
     sync::{
-        atomic::{AtomicU64, Ordering},
         Arc,
+        atomic::{AtomicU64, Ordering},
     },
     task::{Context, Poll},
 };
 use tokio::{
-    fs::{remove_file, rename, File, OpenOptions},
+    fs::{File, OpenOptions, remove_file, rename},
     io::{AsyncWrite, AsyncWriteExt},
     sync::mpsc::{self, UnboundedReceiver, UnboundedSender},
     task::JoinHandle,

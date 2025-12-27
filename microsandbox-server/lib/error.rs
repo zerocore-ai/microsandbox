@@ -13,9 +13,9 @@
 //! - Structured error codes for frontend handling
 
 use axum::{
+    Json,
     http::StatusCode,
     response::{IntoResponse, Response},
-    Json,
 };
 use microsandbox_utils::MicrosandboxUtilsError;
 use serde::{Deserialize, Serialize};

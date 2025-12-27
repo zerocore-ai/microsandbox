@@ -1,5 +1,5 @@
 use nix::{
-    fcntl::{fcntl, FcntlArg, OFlag},
+    fcntl::{FcntlArg, OFlag, fcntl},
     pty::openpty,
     unistd::Pid,
 };
@@ -9,15 +9,15 @@ use std::{
     process::Stdio,
 };
 use tokio::{
-    fs::{create_dir_all, File},
+    fs::{File, create_dir_all},
     io::unix::AsyncFd,
     process::Command,
-    signal::unix::{signal, SignalKind},
+    signal::unix::{SignalKind, signal},
 };
 
 use crate::{
-    path::SUPERVISOR_LOG_FILENAME, term, ChildIo, MicrosandboxUtilsResult, ProcessMonitor,
-    RotatingLog,
+    ChildIo, MicrosandboxUtilsResult, ProcessMonitor, RotatingLog, path::SUPERVISOR_LOG_FILENAME,
+    term,
 };
 
 //--------------------------------------------------------------------------------------------------

@@ -61,10 +61,10 @@
 
 use anyhow::Result;
 use reqwest::Client;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 // Import the parameter types from the microsandbox-portal crate
-use microsandbox_portal::payload::{JsonRpcRequest, SandboxCommandRunParams, JSONRPC_VERSION};
+use microsandbox_portal::payload::{JSONRPC_VERSION, JsonRpcRequest, SandboxCommandRunParams};
 
 //--------------------------------------------------------------------------------------------------
 // Functions

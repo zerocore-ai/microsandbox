@@ -1,9 +1,9 @@
 //! Error handling for microsandbox portal.
 
 use axum::{
+    Json,
     http::StatusCode,
     response::{IntoResponse, Response},
-    Json,
 };
 use thiserror::Error;
 
