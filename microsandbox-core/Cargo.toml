@@ -70,7 +70,6 @@ console.workspace = true
 which = "7.0"
 once_cell = "1.18"
 oci-client = { workspace = true }
-serde_plain.workspace = true
 
 
 [dev-dependencies]
