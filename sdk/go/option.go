@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+
+	"github.com/google/uuid"
 )
 
 // Option configures a sandbox during creation.
@@ -97,7 +99,7 @@ func fillDefaultConfigs() Option {
 			}
 		}
 		if msb.cfg.reqIDPrd == nil {
-			msb.cfg.reqIDPrd = defaultReqIdProducer
+			msb.cfg.reqIDPrd = uuid.NewString
 		}
 	}
 }
