@@ -1,3 +1,0 @@
-(test
- (name test_microsandbox)
- (libraries microsandbox))
