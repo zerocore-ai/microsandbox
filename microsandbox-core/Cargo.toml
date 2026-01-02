@@ -71,6 +71,9 @@ walkdir.workspace = true
 which.workspace = true
 xattr.workspace = true
 
+[dev-dependencies]
+test-log.workspace = true
+
 [features]
 cli = ["indicatif"]
 default = []
