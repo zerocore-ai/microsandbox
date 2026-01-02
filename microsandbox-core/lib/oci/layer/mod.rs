@@ -20,8 +20,9 @@ use tokio_tar::Archive;
 
 use crate::{
     MicrosandboxError, MicrosandboxResult,
-    management::image::ContainerImage,
-    oci::{extraction::extract_tar_with_ownership_override, global_cache::GlobalCacheOps},
+    oci::{
+        extraction::extract_tar_with_ownership_override, global_cache::GlobalCacheOps, image::Image,
+    },
 };
 
 #[async_trait]
@@ -214,7 +215,7 @@ pub(crate) struct LayerDependencies {
     /// The layer digest in focus.
     layer: Digest,
     /// The image this layer belongs to.
-    image: ContainerImage,
+    image: Image,
 }
 
 impl LayerDependencies {
@@ -224,7 +225,7 @@ impl LayerDependencies {
     ///
     /// * `layer` - The layer digest in focus.
     /// * `image` - The image this layer belongs to.
-    pub(crate) fn new(layer: Digest, image: ContainerImage) -> Self {
+    pub(crate) fn new(layer: Digest, image: Image) -> Self {
         Self { layer, image }
     }
 
