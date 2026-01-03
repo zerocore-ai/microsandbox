@@ -66,14 +66,14 @@ const EXTRACT_LAYERS_MSG: &str = "Extracting layers";
 ///     let layer_output_dir = Some(PathBuf::from("/custom/path"));
 ///
 ///     // Pull a single image from Docker registry
-///     image::pull("docker.io/library/ubuntu:latest".parse().unwrap(), layer_output_dir).await?;
+///     image::pull("docker.io/library/ubuntu:latest".parse().unwrap(), layer_output_dir.clone()).await?;
 ///
 ///     // Pull an image from the default registry (when no registry is specified in the reference)
-///     image::pull("nginx:latest".parse().unwrap(), layer_output_dir).await?;
+///     image::pull("nginx:latest".parse().unwrap(), layer_output_dir.clone()).await?;
 ///
 ///     // You can set the OCI_REGISTRY_DOMAIN environment variable to specify your default registry
-///     std::env::set_var("OCI_REGISTRY_DOMAIN", "docker.io");
-///     image::pull("alpine:latest".parse().unwrap(), layer_output_dir).await?;
+///     unsafe { std::env::set_var("OCI_REGISTRY_DOMAIN", "docker.io"); }
+///     image::pull("alpine:latest".parse().unwrap(), layer_output_dir.clone()).await?;
 ///
 ///     // Pull an image from Docker registry and store the layers in a custom directory
 ///     image::pull("docker.io/library/ubuntu:latest".parse().unwrap(), layer_output_dir).await?;

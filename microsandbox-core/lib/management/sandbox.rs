@@ -418,7 +418,7 @@ pub async fn prepare_run(
 ///     // Run a temporary Ubuntu sandbox with custom resources
 ///     sandbox::run_temp(
 ///         &image,
-///         Some("start"),
+///         Some("start"),     // Script name
 ///         Some(2),           // 2 CPUs
 ///         Some(1024),        // 1GB RAM
 ///         vec![              // Mount host's /tmp to sandbox's /data
@@ -431,6 +431,7 @@ pub async fn prepare_run(
 ///             "DEBUG=1".to_string()
 ///         ],
 ///         Some("/app".into()), // Set working directory
+///         None,              // No network scope override
 ///         None,              // No exec command
 ///         vec![],            // No additional args
 ///         true               // Use image defaults
