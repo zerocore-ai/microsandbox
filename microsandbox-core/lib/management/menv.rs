@@ -272,16 +272,17 @@ pub async fn clean(
 /// ## Example
 /// ```no_run
 /// use microsandbox_core::management::menv;
+/// use std::path::Path;
 ///
 /// # async fn example() -> anyhow::Result<()> {
 /// // Show all logs for a sandbox
-/// menv::show_log(None, None, "my-sandbox", false, None).await?;
+/// menv::show_log(None::<&Path>, None, "my-sandbox", false, None).await?;
 ///
 /// // Show last 100 lines of logs
-/// menv::show_log(None, None, "my-sandbox", false, Some(100)).await?;
+/// menv::show_log(None::<&Path>, None, "my-sandbox", false, Some(100)).await?;
 ///
 /// // Follow logs in real-time
-/// menv::show_log(None, None, "my-sandbox", true, None).await?;
+/// menv::show_log(None::<&Path>, None, "my-sandbox", true, None).await?;
 /// # Ok(())
 /// # }
 /// ```
@@ -377,13 +378,15 @@ pub async fn show_log(
 /// ```no_run
 /// use microsandbox_core::management::menv;
 /// use microsandbox_core::management::config;
+/// use std::path::Path;
 ///
 /// # async fn example() -> anyhow::Result<()> {
 /// // Show all sandboxes for a local project
-/// let (config, _, _) = config::load_config(None, None).await?;
+/// let (config, _, _) = config::load_config(None::<&Path>, None).await?;
 /// menv::show_list(config.get_sandboxes());
 ///
-/// // Show all sandboxes for a remote namespace
+/// // Show all sandboxes for a specific namespace directory
+/// let namespace_path = Path::new("/path/to/namespace");
 /// let (config, _, _) = config::load_config(Some(namespace_path), None).await?;
 /// menv::show_list(config.get_sandboxes());
 /// # Ok(())

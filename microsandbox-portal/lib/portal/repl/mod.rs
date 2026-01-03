@@ -25,11 +25,12 @@
 //! To use the code evaluation system, start the engines and then evaluate code:
 //!
 //! ```no_run
-//! use microsandbox_portal::code::{start_engines, Language};
+//! use microsandbox_portal::repl::{start_engines, Language};
 //!
-//! fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! #[tokio::main]
+//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!     // Start all enabled engines
-//!     let handle = start_engines()?;
+//!     let handle = start_engines().await?;
 //!
 //!     // Evaluate code in different languages
 //!     #[cfg(feature = "python")]
@@ -39,7 +40,7 @@
 //!     let js_result = handle.eval("console.log('Hello from JavaScript')", Language::Node)?;
 //!
 //!     // Shutdown engines when done
-//!     handle.shutdown()?;
+//!     handle.shutdown().await?;
 //!     Ok(())
 //! }
 //! ```

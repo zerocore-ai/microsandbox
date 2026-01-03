@@ -19,16 +19,13 @@ use crate::MicrosandboxResult;
 /// This removes all scripts in ~/.local/bin that contain the MSB-ALIAS marker,
 /// except for the core toolchain scripts (msi, msx, msr).
 ///
-/// ## Arguments
-/// * `force` - Whether to force cleaning even if script files exist
-///
 /// ## Example
 /// ```no_run
 /// use microsandbox_core::management::toolchain;
 ///
 /// # async fn example() -> anyhow::Result<()> {
 /// // Clean all user-installed scripts
-/// toolchain::clean(true).await?;
+/// toolchain::clean().await?;
 /// # Ok(())
 /// # }
 /// ```

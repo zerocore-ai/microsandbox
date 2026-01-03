@@ -32,15 +32,16 @@
 //! ```no_run
 //! use microsandbox_portal::repl::{start_engines, Language};
 //!
-//! fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! #[tokio::main]
+//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!     // Initialize REPL engines
-//!     let engines = start_engines()?;
+//!     let engines = start_engines().await?;
 //!
 //!     // Execute Python code in REPL
 //!     #[cfg(feature = "python")]
 //!     let result = engines.eval("print('Hello from microsandbox!')", Language::Python)?;
 //!
-//!     engines.shutdown()?;
+//!     engines.shutdown().await?;
 //!     Ok(())
 //! }
 //! ```
@@ -55,8 +56,8 @@
 //!     // Create a command executor
 //!     let cmd_handle = create_command_executor();
 //!
-//!     // Execute a system command
-//!     let (exit_code, output) = cmd_handle.execute("ls", vec!["-la"]).await?;
+//!     // Execute a system command (command, args, timeout)
+//!     let (exit_code, output) = cmd_handle.execute("ls", vec!["-la".to_string()], None).await?;
 //!
 //!     // Process the output
 //!     for line in output {

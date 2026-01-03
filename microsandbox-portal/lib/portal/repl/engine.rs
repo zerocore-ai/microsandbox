@@ -31,18 +31,19 @@
 //! # Example
 //!
 //! ```no_run
-//! use microsandbox_portal::code::{start_engines, Language};
+//! use microsandbox_portal::repl::{start_engines, Language};
 //!
-//! fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! #[tokio::main]
+//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!     // Start the engines
-//!     let handle = start_engines()?;
+//!     let handle = start_engines().await?;
 //!
 //!     // Evaluate Python code
 //!     #[cfg(feature = "python")]
 //!     let result = handle.eval("print('Hello, world!')", Language::Python)?;
 //!
 //!     // Shutdown
-//!     handle.shutdown()?;
+//!     handle.shutdown().await?;
 //!     Ok(())
 //! }
 //! ```

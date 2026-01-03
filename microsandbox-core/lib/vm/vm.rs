@@ -39,7 +39,7 @@ pub const VIRTIOFS_TAG_PREFIX: &str = "virtiofs";
 /// let temp_dir = TempDir::new()?;
 /// let vm = MicroVm::builder()
 ///     .rootfs(Rootfs::Native(temp_dir.path().to_path_buf()))
-///     .ram_mib(1024)
+///     .memory_mib(1024)
 ///     .exec_path("/bin/echo")
 ///     .args(["Hello, World!"])
 ///     .build()?;
@@ -225,7 +225,7 @@ impl MicroVm {
     /// let temp_dir = TempDir::new()?;
     /// let vm = MicroVm::builder()
     ///     .rootfs(Rootfs::Native(temp_dir.path().to_path_buf()))
-    ///     .ram_mib(1024)
+    ///     .memory_mib(1024)
     ///     .exec_path("/bin/echo")
     ///     .build()?;
     /// # Ok(())
@@ -250,7 +250,7 @@ impl MicroVm {
     /// let temp_dir = TempDir::new()?;
     /// let vm = MicroVm::builder()
     ///     .rootfs(Rootfs::Native(temp_dir.path().to_path_buf()))
-    ///     .ram_mib(1024)
+    ///     .memory_mib(1024)
     ///     .exec_path("/usr/bin/python3")
     ///     .args(["-c", "print('Hello from MicroVm!')"])
     ///     .build()?;

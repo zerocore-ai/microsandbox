@@ -861,24 +861,21 @@ pub async fn show_status(
 /// ## Example
 ///
 /// ```no_run
-/// use std::path::PathBuf;
+/// use std::path::Path;
 /// use microsandbox_core::management::orchestra;
 ///
 /// #[tokio::main]
 /// async fn main() -> anyhow::Result<()> {
-///     // Get all namespace directories
-///     let namespaces = vec![
-///         PathBuf::from("/path/to/namespaces/ns1"),
-///         PathBuf::from("/path/to/namespaces/ns2"),
-///     ];
+///     // Parent directory containing all namespace subdirectories
+///     let namespaces_parent = Path::new("/path/to/namespaces");
 ///
 ///     // Show status for all sandboxes in all namespaces
-///     orchestra::show_status_namespaces(&[], namespaces.iter().map(|p| p.as_path()).collect()).await?;
+///     orchestra::show_status_namespaces(&[], namespaces_parent).await?;
 ///
 ///     // Or show status for specific sandboxes
 ///     orchestra::show_status_namespaces(
 ///         &["sandbox1".to_string(), "sandbox2".to_string()],
-///         namespaces.iter().map(|p| p.as_path()).collect()
+///         namespaces_parent
 ///     ).await?;
 ///
 ///     Ok(())
