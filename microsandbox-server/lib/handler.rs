@@ -259,8 +259,10 @@ pub async fn forward_rpc_to_portal(
     let client = reqwest::Client::new();
 
     // Configure connection retry parameters
-    const MAX_RETRIES: u32 = 10_000;
+    // The portal inside the sandbox may take some time to start, so we need to retry
+    const MAX_RETRIES: u32 = 300;
     const TIMEOUT_MS: u64 = 50;
+    const RETRY_DELAY_MS: u64 = 10;
 
     // Try to establish a connection to the portal before sending the actual request
     let mut retry_count = 0;
@@ -293,6 +295,9 @@ pub async fn forward_rpc_to_portal(
 
         // Increment retry counter
         retry_count += 1;
+
+        // Wait before the next retry to give the portal time to start
+        sleep(Duration::from_millis(RETRY_DELAY_MS)).await;
     }
 
     // If we've hit the max retries and still can't connect, report the error
