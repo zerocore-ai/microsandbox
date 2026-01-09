@@ -17,7 +17,7 @@ Let's help you start your first self-hosted sandbox server. It's easy!
 #### 1. Install CLI
 
 ```sh
-curl -sSL https://raw.githubusercontent.com/zerocore-ai/microsandbox/refs/heads/main/scripts/install_microsandbox.sh | sh
+curl -sSL https://get.microsandbox.dev | sh
 ```
 
 This will install the `msb` CLI tool, which helps you manage sandboxes locally.

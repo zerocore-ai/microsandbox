@@ -13,7 +13,7 @@ Complete reference documentation for the microsandbox command-line interface.
 ### Installation
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/zerocore-ai/microsandbox/refs/heads/main/scripts/install_microsandbox.sh | sh
+curl -sSL https://get.microsandbox.dev | sh
 ```
 
 ---

@@ -40,7 +40,7 @@ Ever needed to run code you don't fully trust? Whether it's AI-generated code, u
 +++ :icon-download: Install
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/zerocore-ai/microsandbox/refs/heads/main/scripts/install_microsandbox.sh | sh
+curl -sSL https://get.microsandbox.dev | sh
 ```
 
 +++ :icon-play: Start

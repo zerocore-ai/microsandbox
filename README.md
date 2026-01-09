@@ -68,7 +68,7 @@ Microsandbox is designed to be the execution backbone of the agentic web—fast,
 ##### <img height="14" src="https://octicons-col.vercel.app/download/A770EF">&nbsp;&nbsp;1. Download `microsandbox`
 
 ```sh
-curl -sSL https://raw.githubusercontent.com/zerocore-ai/microsandbox/refs/heads/main/scripts/install_microsandbox.sh | sh
+curl -sSL https://get.microsandbox.dev | sh
 ```
 
 ##### <img height="14" src="https://octicons-col.vercel.app/play/A770EF">&nbsp;&nbsp;2. Start the server

@@ -24,7 +24,7 @@ This guide will help you get up and running with secure code execution in minute
 The easiest way to install microsandbox is using our installation script:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/zerocore-ai/microsandbox/refs/heads/main/scripts/install_microsandbox.sh | sh
+curl -sSL https://get.microsandbox.dev | sh
 ```
 
 This will download and install the `msb` command-line tool on your system.
