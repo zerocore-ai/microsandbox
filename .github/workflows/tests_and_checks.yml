@@ -137,7 +137,7 @@ jobs:
       - name: Run Linter
         uses: actions-rs/cargo@v1
         with:
-          args: --all -- -D warnings
+          args: --all --all-features -- -D warnings
           command: clippy
           toolchain: stable
 
@@ -152,10 +152,11 @@ jobs:
         with:
           command: check bans licenses sources
 
-      - name: Test Release
+      - name: Check Release Build
         run: |
           export LIBRARY_PATH=${{ github.workspace }}/build:${{ github.workspace }}/build/libkrunfw:${{ github.workspace }}/build/libkrun/target/release
           export LD_LIBRARY_PATH=${{ github.workspace }}/build:${{ github.workspace }}/build/libkrunfw:${{ github.workspace }}/build/libkrun/target/release
+          cargo check --all-features
           cargo build --release
 
   run-tests:

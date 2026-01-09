@@ -60,7 +60,7 @@ jobs:
           echo "Publishing microsandbox SDK..."
           if cargo publish 2>&1 | tee publish.log; then
             echo "✓ Successfully published microsandbox SDK"
-          elif grep -q "already uploaded" publish.log; then
+          elif grep -q "already exists on crates.io index" publish.log; then
             echo "⚠ microsandbox SDK already published, skipping..."
           else
             echo "✗ Failed to publish microsandbox SDK"

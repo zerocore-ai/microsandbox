@@ -88,7 +88,7 @@ impl Engine for PythonEngine {
             // Start Python process with interactive mode
             // -q: hide banner, -u: unbuffered, -i: interactive, clear prompts
             let mut process = match Command::new("python3")
-                .args(&["-q", "-u", "-i", "-c", "import sys; sys.ps1=sys.ps2=''"])
+                .args(["-q", "-u", "-i", "-c", "import sys; sys.ps1=sys.ps2=''"])
                 .stdin(std::process::Stdio::piped())
                 .stdout(std::process::Stdio::piped())
                 .stderr(std::process::Stdio::piped())
@@ -167,15 +167,15 @@ impl Engine for PythonEngine {
                             }
 
                             // Send line if it's not an EOE marker
-                            if should_send {
-                                if let Some(status) = stdout_exec_status.lock().unwrap().as_ref() {
-                                    // Use block_on to send the message
-                                    let _ = runtime.block_on(status.sender.send(Resp::Line {
-                                        id: status.id.clone(),
-                                        stream: Stream::Stdout,
-                                        text: line,
-                                    }));
-                                }
+                            if should_send
+                                && let Some(status) = stdout_exec_status.lock().unwrap().as_ref()
+                            {
+                                // Use block_on to send the message
+                                let _ = runtime.block_on(status.sender.send(Resp::Line {
+                                    id: status.id.clone(),
+                                    stream: Stream::Stdout,
+                                    text: line,
+                                }));
                             }
                         }
                         Ok(None) => break, // EOF
@@ -291,7 +291,7 @@ impl Engine for PythonEngine {
                             match timeout {
                                 Some(timeout_secs) => {
                                     let timeout_duration = Duration::from_secs(timeout_secs);
-                                    if let Err(_) = tokio_timeout(timeout_duration, wait_future).await {
+                                    if tokio_timeout(timeout_duration, wait_future).await.is_err() {
                                         // Timeout occurred
                                         let _ = resp_tx.send(Resp::Error {
                                             id: id.clone(),

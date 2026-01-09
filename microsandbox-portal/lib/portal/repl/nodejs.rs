@@ -88,7 +88,7 @@ impl Engine for NodeEngine {
             // Start Node.js process with custom REPL
             // Custom REPL starts with no prompt, no terminal features, and ignores undefined
             let mut process = match Command::new("node")
-                .args(&[
+                .args([
                     "-e",
                     "const r=require('repl').start({prompt:'',terminal:false,ignoreUndefined:true,useGlobal:true});r._prompt='';r.displayPrompt=()=>{}",
                 ])
@@ -175,17 +175,16 @@ impl Engine for NodeEngine {
                                 }
 
                                 // Send line if it's not an EOE marker
-                                if should_send {
-                                    if let Some(status) =
+                                if should_send
+                                    && let Some(status) =
                                         stdout_exec_status.lock().unwrap().as_ref()
-                                    {
-                                        // Use block_on to send the message
-                                        let _ = runtime.block_on(status.sender.send(Resp::Line {
-                                            id: status.id.clone(),
-                                            stream: Stream::Stdout,
-                                            text: line,
-                                        }));
-                                    }
+                                {
+                                    // Use block_on to send the message
+                                    let _ = runtime.block_on(status.sender.send(Resp::Line {
+                                        id: status.id.clone(),
+                                        stream: Stream::Stdout,
+                                        text: line,
+                                    }));
                                 }
                             }
                         }
@@ -307,7 +306,7 @@ impl Engine for NodeEngine {
                             match timeout {
                                 Some(timeout_secs) => {
                                     let timeout_duration = Duration::from_secs(timeout_secs);
-                                    if let Err(_) = tokio_timeout(timeout_duration, wait_future).await {
+                                    if tokio_timeout(timeout_duration, wait_future).await.is_err() {
                                         // Timeout occurred
                                         let _ = resp_tx.send(Resp::Error {
                                             id: id.clone(),

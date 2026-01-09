@@ -95,4 +95,3 @@ xattr = "1.3"
 
 [patch.crates-io]
 oci-client = { git = "https://github.com/toksdotdev/rust-oci-client.git", branch = "toks/string-impl-for-enums" }
-oci-spec = { git = "https://github.com/youki-dev/oci-spec-rs.git" }

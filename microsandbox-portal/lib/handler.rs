@@ -93,6 +93,7 @@ async fn sandbox_run_impl(_state: SharedState, params: Value) -> Result<Value, P
 
     // Convert language string to Language enum
     #[cfg(any(feature = "python", feature = "nodejs"))]
+    #[allow(clippy::needless_late_init)]
     let language;
 
     match params.language.to_lowercase().as_str() {
