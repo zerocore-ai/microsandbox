@@ -1,0 +1,45 @@
+name: 🚀 Release Docs
+
+on:
+  push:
+    branches: [ main, 'toks/publish-docs' ]
+
+jobs:
+  deploy-workers:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install Retype
+        run: npm install -g retypeapp
+      - name: Build docs
+        working-directory: docs
+        run: retype build
+      - name: Deploy docs.microsandbox.dev
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy .retype --project-name=microsandbox-docs --commit-dirty=true
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+
+  deploy-get-msb-worker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Deploy get.microsandbox.dev
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy workers/get-msb
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}

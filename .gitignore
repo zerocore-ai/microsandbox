@@ -23,3 +23,6 @@ libkrunfw.*
 libkrun.*
 .menv/
 Sandboxfile*
+
+# Retype
+.retype/
