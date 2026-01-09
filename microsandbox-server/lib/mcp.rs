@@ -437,14 +437,14 @@ pub async fn handle_mcp_call_tool(
             "sandbox.start" => {
                 let params: SandboxStartParams = serde_json::from_value(arguments.clone())
                     .map_err(|e| {
-                        return JsonRpcResponse::error(
+                        JsonRpcResponse::error(
                             JsonRpcError {
                                 code: -32602,
                                 message: format!("Invalid parameters: {}", e),
                                 data: None,
                             },
                             request.id.clone(),
-                        );
+                        )
                     })
                     .unwrap();
 
@@ -463,14 +463,14 @@ pub async fn handle_mcp_call_tool(
             "sandbox.stop" => {
                 let params: SandboxStopParams = serde_json::from_value(arguments.clone())
                     .map_err(|e| {
-                        return JsonRpcResponse::error(
+                        JsonRpcResponse::error(
                             JsonRpcError {
                                 code: -32602,
                                 message: format!("Invalid parameters: {}", e),
                                 data: None,
                             },
                             request.id.clone(),
-                        );
+                        )
                     })
                     .unwrap();
 
@@ -489,14 +489,14 @@ pub async fn handle_mcp_call_tool(
             "sandbox.metrics.get" => {
                 let params: SandboxMetricsGetParams = serde_json::from_value(arguments.clone())
                     .map_err(|e| {
-                        return JsonRpcResponse::error(
+                        JsonRpcResponse::error(
                             JsonRpcError {
                                 code: -32602,
                                 message: format!("Invalid parameters: {}", e),
                                 data: None,
                             },
                             request.id.clone(),
-                        );
+                        )
                     })
                     .unwrap();
 

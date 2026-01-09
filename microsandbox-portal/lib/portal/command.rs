@@ -138,6 +138,12 @@ struct CommandRequest {
 // Methods
 //--------------------------------------------------------------------------------------------------
 
+impl Default for CommandHandle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CommandHandle {
     /// Creates a new command handle
     pub fn new() -> Self {

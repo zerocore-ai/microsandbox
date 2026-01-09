@@ -67,7 +67,7 @@ You don't need to be an expert programmer to contribute code! Here's a friendly 
 
 6. **Build the project**
 
-   - Follow the instructions in our [README file](./README.md)
+   - Follow the instructions in our [DEVELOPMENT.md](./DEVELOPMENT.md) file
    - If you run into any issues, remember we're just an email away!
 
 7. **Make your changes**
@@ -85,15 +85,16 @@ You don't need to be an expert programmer to contribute code! Here's a friendly 
 
 9. **Follow coding guidelines**
 
-   - Check out our [Rust style guide][rust-style-guide] for reference
-   - Clean, readable code helps everyone who comes after you
-   - If you're unsure about anything, just do your best and mention it in your PR
+    - Check out our [Rust style guide][rust-style-guide] for reference
+    - Clean, readable code helps everyone who comes after you
+    - If you're unsure about anything, just do your best and mention it in your PR
 
 10. **Commit and push your changes**
 
     - Send your work to your GitHub repository
     - We use [conventional commits][conventional-commits] for naming
     - New to Git? Learn about [committing code][committing-code] and [pushing][push-remote]
+    - Pre-commit hooks will run automatically if you installed them
 
 11. **Open a pull request** 🎉
     - This is how your code gets merged into the main project

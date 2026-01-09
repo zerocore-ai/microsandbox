@@ -64,10 +64,10 @@ impl GlobalLayerOps for GlobalLayerCache {
         }
 
         // if there's at least one file in that specific layer directory, it means the layer already exists
-        if let Ok(mut read_dir) = tokio::fs::read_dir(&path).await {
-            if let Ok(Some(_)) = read_dir.next_entry().await {
-                return Some(path);
-            }
+        if let Ok(mut read_dir) = tokio::fs::read_dir(&path).await
+            && let Ok(Some(_)) = read_dir.next_entry().await
+        {
+            return Some(path);
         }
 
         None

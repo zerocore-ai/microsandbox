@@ -11,7 +11,8 @@ repos:
         entry: cargo +nightly fmt
         language: system
         types: [rust]
-        args: ["--", "--check"]
+        args: ["--all"]
+        pass_filenames: false
       - id: cargo-check
         name: cargo check
         description: Check the package for errors.
@@ -24,7 +25,7 @@ repos:
         description: Lint via clippy
         entry: cargo clippy
         language: system
-        args: ["--", "-D", "warnings"]
+        args: ["--all", "--", "-D", "warnings"]
         types: [rust]
         pass_filenames: false
 
@@ -33,6 +34,14 @@ repos:
     hooks:
       - id: cargo-sort
         args: []
+
+  - repo: https://github.com/ComPWA/taplo-pre-commit
+    rev: v0.9.3
+    hooks:
+      - id: taplo-format
+        name: taplo format
+        description: Format TOML files with Taplo
+        types: [toml]
 
   - repo: https://github.com/compilerla/conventional-pre-commit
     rev: v2.1.1

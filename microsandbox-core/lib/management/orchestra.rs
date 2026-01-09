@@ -242,9 +242,7 @@ pub async fn apply(
             #[cfg(feature = "cli")]
             apply_config_sp.finish();
 
-            if let Err(e) = run_commands_with_prefixed_output(sandbox_commands).await {
-                return Err(e);
-            }
+            run_commands_with_prefixed_output(sandbox_commands).await?;
 
             // Return early as we've already finished the spinner
             return Ok(());
@@ -447,9 +445,7 @@ pub async fn up(
             #[cfg(feature = "cli")]
             start_sandboxes_sp.finish();
 
-            if let Err(e) = run_commands_with_prefixed_output(sandbox_commands).await {
-                return Err(e);
-            }
+            run_commands_with_prefixed_output(sandbox_commands).await?;
 
             // Return early as we've already finished the spinner
             return Ok(());
@@ -713,54 +709,54 @@ pub async fn status(
             };
 
             // If the sandbox is running, get additional stats
-            if sandbox_status.running {
-                if let Some(sandbox) = running_sandbox_map.get(sandbox_name) {
-                    sandbox_status.supervisor_pid = Some(sandbox.supervisor_pid);
-                    sandbox_status.microvm_pid = Some(sandbox.microvm_pid);
-                    sandbox_status.rootfs_paths = Some(sandbox.rootfs_paths.clone());
+            if sandbox_status.running
+                && let Some(sandbox) = running_sandbox_map.get(sandbox_name)
+            {
+                sandbox_status.supervisor_pid = Some(sandbox.supervisor_pid);
+                sandbox_status.microvm_pid = Some(sandbox.microvm_pid);
+                sandbox_status.rootfs_paths = Some(sandbox.rootfs_paths.clone());
 
-                    // Get CPU and memory usage for the microVM process
-                    if let Ok(mut process) = psutil::process::Process::new(sandbox.microvm_pid) {
-                        // CPU usage
-                        if let Ok(cpu_percent) = process.cpu_percent() {
-                            sandbox_status.cpu_usage = Some(cpu_percent);
-                        }
-
-                        // Memory usage
-                        if let Ok(memory_info) = process.memory_info() {
-                            // Convert bytes to MiB
-                            sandbox_status.memory_usage = Some(memory_info.rss() / (1024 * 1024));
-                        }
+                // Get CPU and memory usage for the microVM process
+                if let Ok(mut process) = psutil::process::Process::new(sandbox.microvm_pid) {
+                    // CPU usage
+                    if let Ok(cpu_percent) = process.cpu_percent() {
+                        sandbox_status.cpu_usage = Some(cpu_percent);
                     }
 
-                    // Get disk usage of the RW layer if it's an overlayfs
-                    if sandbox.rootfs_paths.starts_with("overlayfs:") {
-                        let paths: Vec<&str> = sandbox.rootfs_paths.split(':').collect();
-                        if paths.len() > 1 {
-                            // The last path should be the RW layer
-                            let rw_path = paths.last().unwrap();
-                            if let Ok(metadata) = tokio::fs::metadata(rw_path).await {
-                                // For a directory, we need to calculate the total size
-                                if metadata.is_dir() {
-                                    if let Ok(size) = get_directory_size(rw_path).await {
-                                        sandbox_status.disk_usage = Some(size);
-                                    }
-                                } else {
-                                    sandbox_status.disk_usage = Some(metadata.len());
-                                }
-                            }
-                        }
-                    } else if sandbox.rootfs_paths.starts_with("native:") {
-                        // For native rootfs, get the size of the rootfs
-                        let path = sandbox.rootfs_paths.strip_prefix("native:").unwrap();
-                        if let Ok(metadata) = tokio::fs::metadata(path).await {
+                    // Memory usage
+                    if let Ok(memory_info) = process.memory_info() {
+                        // Convert bytes to MiB
+                        sandbox_status.memory_usage = Some(memory_info.rss() / (1024 * 1024));
+                    }
+                }
+
+                // Get disk usage of the RW layer if it's an overlayfs
+                if sandbox.rootfs_paths.starts_with("overlayfs:") {
+                    let paths: Vec<&str> = sandbox.rootfs_paths.split(':').collect();
+                    if paths.len() > 1 {
+                        // The last path should be the RW layer
+                        let rw_path = paths.last().unwrap();
+                        if let Ok(metadata) = tokio::fs::metadata(rw_path).await {
+                            // For a directory, we need to calculate the total size
                             if metadata.is_dir() {
-                                if let Ok(size) = get_directory_size(path).await {
+                                if let Ok(size) = get_directory_size(rw_path).await {
                                     sandbox_status.disk_usage = Some(size);
                                 }
                             } else {
                                 sandbox_status.disk_usage = Some(metadata.len());
                             }
+                        }
+                    }
+                } else if sandbox.rootfs_paths.starts_with("native:") {
+                    // For native rootfs, get the size of the rootfs
+                    let path = sandbox.rootfs_paths.strip_prefix("native:").unwrap();
+                    if let Ok(metadata) = tokio::fs::metadata(path).await {
+                        if metadata.is_dir() {
+                            if let Ok(size) = get_directory_size(path).await {
+                                sandbox_status.disk_usage = Some(size);
+                            }
+                        } else {
+                            sandbox_status.disk_usage = Some(metadata.len());
                         }
                     }
                 }
@@ -822,7 +818,7 @@ pub async fn show_status(
             // Clear the screen by printing ANSI escape code
             print!("\x1B[2J\x1B[1;1H");
 
-            display_status(&names, path.as_deref(), config.as_deref()).await?;
+            display_status(names, path, config).await?;
 
             // Show update message
             println!(
@@ -835,7 +831,7 @@ pub async fn show_status(
         }
     } else {
         // Just display once for non-TTY
-        display_status(&names, path.as_deref(), config.as_deref()).await?;
+        display_status(names, path, config).await?;
     }
 
     Ok(())
@@ -1587,10 +1583,10 @@ async fn get_directory_size(path: &str) -> MicrosandboxResult<u64> {
     // First attempt to serve from cache
     {
         let cache = DISK_SIZE_CACHE.read().unwrap();
-        if let Some((size, ts)) = cache.get(path) {
-            if ts.elapsed() < DISK_SIZE_TTL {
-                return Ok(*size);
-            }
+        if let Some((size, ts)) = cache.get(path)
+            && ts.elapsed() < DISK_SIZE_TTL
+        {
+            return Ok(*size);
         }
     }
 

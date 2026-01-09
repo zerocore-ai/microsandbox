@@ -199,9 +199,15 @@ ORIGINAL_DIR="$(pwd)"
 export PATH="/usr/local/bin:/usr/bin:/bin:$PATH"
 
 # Set up variables
+LIBKRUNFW_FULL_VERSION="${LIBKRUNFW_FULL_VERSION:-4.10.0}"
+LIBKRUNFW_ABI_VERSION="${LIBKRUNFW_ABI_VERSION:-4}"
+LIBKRUN_VERSION="${LIBKRUN_VERSION:-1.14.0}"
+LIBKRUN_ABI_VERSION="${LIBKRUN_ABI_VERSION:-1}"
 BUILD_DIR="$ORIGINAL_DIR/build"
 LIBKRUNFW_REPO="https://github.com/microsandbox/libkrunfw.git"
 LIBKRUN_REPO="https://github.com/microsandbox/libkrun.git"
+LIBKRUNFW_BRANCH="releases/v${LIBKRUNFW_FULL_VERSION}"
+LIBKRUN_BRANCH="releases/v${LIBKRUN_VERSION}"
 NO_CLEANUP=false
 FORCE_BUILD=false
 
@@ -354,12 +360,39 @@ get_full_version() {
     echo "$full_version"
 }
 
+# Function to assert version matches Makefile
+assert_version() {
+    local makefile="$1"
+    local expected_abi="$2"
+    local expected_full="$3"
+    local actual_abi="$4"
+    local actual_full="$5"
+    local lib_name="$6"
+
+    if [ "$actual_abi" != "$expected_abi" ]; then
+        error "Version mismatch for $lib_name: Expected ABI_VERSION=$expected_abi but Makefile has $actual_abi"
+        error "Please update the version constants in this script or set the ${lib_name}_ABI_VERSION environment variable"
+        exit 1
+    fi
+
+    if [ "$actual_full" != "$expected_full" ]; then
+        error "Version mismatch for $lib_name: Expected FULL_VERSION=$expected_full but Makefile has $actual_full"
+        error "Please update the version constants in this script or set the ${lib_name}_VERSION environment variable"
+        exit 1
+    fi
+
+    info "Version assertion passed for $lib_name: ABI=$actual_abi, FULL=$actual_full"
+}
+
 # Function to build and copy libkrunfw
 build_libkrunfw() {
     cd "$BUILD_DIR/libkrunfw" || { error "Failed to change to libkrunfw directory"; exit 1; }
 
     local abi_version=$(get_abi_version "Makefile")
+    local full_version=$(get_full_version "Makefile")
     info "Detected libkrunfw ABI version: $abi_version"
+    info "Detected libkrunfw FULL version: $full_version"
+    assert_version "Makefile" "$LIBKRUNFW_ABI_VERSION" "$LIBKRUNFW_FULL_VERSION" "$abi_version" "$full_version" "libkrunfw"
 
     info "Building libkrunfw..."
     export PYTHONPATH="$HOME/.local/lib/python3.*/site-packages:$PYTHONPATH"
@@ -375,17 +408,17 @@ build_libkrunfw() {
     esac
     check_success "Failed to build libkrunfw"
 
-    # Copy the library to build directory and create symlink
+    # Copy and rename the library to build directory and create symlink
     info "Copying libkrunfw to build directory..."
     cd "$BUILD_DIR" || { error "Failed to change to build directory"; exit 1; }
     case "$OS_TYPE" in
         Linux)
-            cp libkrunfw/libkrunfw.so.$abi_version.* "libkrunfw.so.$abi_version"
+            cp libkrunfw/libkrunfw.so.$full_version "libkrunfw.so.$abi_version"
             patchelf --set-rpath '$ORIGIN' "libkrunfw.so.$abi_version"
             ln -sf "libkrunfw.so.$abi_version" "libkrunfw.so"
             ;;
         Darwin)
-            cp libkrunfw/libkrunfw.$abi_version.dylib "libkrunfw.$abi_version.dylib"
+            cp libkrunfw/libkrunfw.$full_version.dylib "libkrunfw.$abi_version.dylib"
             install_name_tool -id "@rpath/libkrunfw.$abi_version.dylib" "libkrunfw.$abi_version.dylib"
             ln -sf "libkrunfw.$abi_version.dylib" "libkrunfw.dylib"
             ;;
@@ -405,6 +438,7 @@ build_libkrun() {
     local full_version=$(get_full_version "Makefile")
     info "Detected libkrun ABI version: $abi_version"
     info "Detected libkrun FULL version: $full_version"
+    assert_version "Makefile" "$LIBKRUN_ABI_VERSION" "$LIBKRUN_VERSION" "$abi_version" "$full_version" "libkrun"
 
     info "Building libkrun..."
     # Update library path to use our build directory
@@ -428,13 +462,11 @@ build_libkrun() {
         Linux)
             cp libkrun/target/release/libkrun.so.$full_version "libkrun.so.$abi_version"
             patchelf --set-rpath '$ORIGIN' "libkrun.so.$abi_version"
-            patchelf --set-needed "libkrunfw.so.4" "libkrun.so.$abi_version"
             ln -sf "libkrun.so.$abi_version" "libkrun.so"
             ;;
         Darwin)
             cp libkrun/target/release/libkrun.$full_version.dylib "libkrun.$abi_version.dylib"
             install_name_tool -id "@rpath/libkrun.$abi_version.dylib" "libkrun.$abi_version.dylib"
-            install_name_tool -change "libkrunfw.4.dylib" "@rpath/libkrunfw.4.dylib" "libkrun.$abi_version.dylib"
             ln -sf "libkrun.$abi_version.dylib" "libkrun.dylib"
             ;;
         *)
@@ -449,14 +481,14 @@ build_libkrun() {
 check_existing_lib "libkrunfw"
 if [ $? -eq 0 ]; then
     create_build_directory
-    clone_repo "$LIBKRUNFW_REPO" "libkrunfw" --single-branch --branch develop
+    clone_repo "$LIBKRUNFW_REPO" "libkrunfw" --single-branch --branch "$LIBKRUNFW_BRANCH"
     build_libkrunfw
 fi
 
 check_existing_lib "libkrun"
 if [ $? -eq 0 ]; then
     create_build_directory
-    clone_repo "$LIBKRUN_REPO" "libkrun" --single-branch --branch develop
+    clone_repo "$LIBKRUN_REPO" "libkrun" --single-branch --branch "$LIBKRUN_BRANCH"
     build_libkrun
 fi
 

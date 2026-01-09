@@ -86,6 +86,7 @@ const TEMPORARY_SANDBOX_NAME: &str = "tmp";
 ///     Ok(())
 /// }
 /// ```
+#[allow(clippy::too_many_arguments)]
 pub async fn run(
     sandbox_name: &str,
     script_name: Option<&str>,
@@ -152,6 +153,7 @@ pub async fn run(
 /// Returns a tuple containing:
 /// - The prepared command ready for execution
 /// - Whether the command should be run in detached mode
+#[allow(clippy::too_many_arguments)]
 pub async fn prepare_run(
     sandbox_name: &str,
     script_name: Option<&str>,
@@ -244,7 +246,7 @@ pub async fn prepare_run(
         .arg("--config-file")
         .arg(&config_file)
         .arg("--config-last-modified")
-        .arg(&config_last_modified.to_rfc3339())
+        .arg(config_last_modified.to_rfc3339())
         .arg("--sandbox-db-path")
         .arg(&sandbox_db_path)
         .arg("--scope")
@@ -439,6 +441,7 @@ pub async fn prepare_run(
 ///     Ok(())
 /// }
 /// ```
+#[allow(clippy::too_many_arguments)]
 pub async fn run_temp(
     image: &Reference,
     script: Option<&str>,
@@ -533,6 +536,7 @@ pub async fn run_temp(
 // Functions: Helpers
 //--------------------------------------------------------------------------------------------------
 
+#[allow(clippy::too_many_arguments)]
 async fn setup_image_rootfs(
     image: &Reference,
     sandbox_name: &str,
@@ -617,7 +621,7 @@ async fn setup_image_rootfs(
         // Patch with sandbox scripts
         rootfs::patch_with_sandbox_scripts(
             &script_dir,
-            &sandbox_config.get_scripts(),
+            sandbox_config.get_scripts(),
             sandbox_config
                 .get_shell()
                 .as_ref()
@@ -678,7 +682,7 @@ async fn setup_native_rootfs(
         // Patch with sandbox scripts
         rootfs::patch_with_sandbox_scripts(
             &scripts_dir,
-            &sandbox_config.get_scripts(),
+            sandbox_config.get_scripts(),
             sandbox_config
                 .get_shell()
                 .as_ref()

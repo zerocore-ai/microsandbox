@@ -1,0 +1,28 @@
+[[rule]]
+include = ["**/*.toml"]
+
+[rule.formatting]
+auto_array_collapse = false
+indent_string = "    "
+reorder_arrays = true
+
+[[rule]]
+include = ["**/Cargo.toml", "Cargo.toml"]
+keys = ["build-dependencies", "dependencies", "dev-dependencies"]
+
+[rule.formatting]
+reorder_keys = true
+
+[[rule]]
+include = [".cargo/config.toml"]
+
+[rule.formatting]
+reorder_arrays = true
+
+[[rule]]
+include = ["**/pyproject.toml"]
+keys = ["project"]
+
+[rule.formatting]
+reorder_arrays = true
+array_auto_expand = true

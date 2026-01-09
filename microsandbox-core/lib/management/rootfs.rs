@@ -26,11 +26,11 @@ pub const OPAQUE_WHITEOUT_MARKER: &str = ".wh..wh..opq";
 pub const WHITEOUT_PREFIX: &str = ".wh.";
 
 // The xattr name to set
-const XATTR_OVERRIDE_STATS_NAME: &'static str = "user.containers.override_stat";
+const XATTR_OVERRIDE_STATS_NAME: &str = "user.containers.override_stat";
 
 // The value in the format "uid:gid:mode" (0:0:040755 means root:root directory with rwxr-xr-x permissions)
 // 040000 is S_IFDIR (directory file type), 0755 are the permissions
-const XATTR_OVERRIDE_STATS_VALUE: &'static str = "0:0:040755";
+const XATTR_OVERRIDE_STATS_VALUE: &str = "0:0:040755";
 
 //--------------------------------------------------------------------------------------------------
 // Structs
@@ -263,8 +263,8 @@ async fn _patch_with_hostnames(
 ///
 /// ## Arguments
 /// * `root_paths` - List of root paths to check, ordered from bottom to top layer
-///                  For overlayfs, this should be [lower_layers..., patch_dir]
-///                  For native rootfs, this should be [root_path]
+///   For overlayfs, this should be [lower_layers..., patch_dir]
+///   For native rootfs, this should be [root_path]
 ///
 /// ## Errors
 /// Returns an error if:
@@ -357,8 +357,7 @@ pub async fn patch_with_stat_override(root_path: &Path) -> MicrosandboxResult<()
             );
             Ok(())
         }
-        Err(err) => Err(crate::MicrosandboxError::Io(std::io::Error::new(
-            std::io::ErrorKind::Other,
+        Err(err) => Err(crate::MicrosandboxError::Io(std::io::Error::other(
             format!("Failed to set xattr on {}: {}", root_path.display(), err),
         ))),
     }

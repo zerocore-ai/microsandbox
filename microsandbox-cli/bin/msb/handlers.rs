@@ -5,7 +5,7 @@ use microsandbox_cli::{
 use microsandbox_core::{
     config::START_SCRIPT_NAME,
     management::{
-        config::{self, Component, ComponentType},
+        config::{self, Component, ComponentType, SandboxConfig},
         home, menv, orchestra, sandbox, toolchain,
     },
     oci::Reference,
@@ -47,6 +47,7 @@ pub fn log_level(args: &MicrosandboxArgs) {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn add_subcommand(
     sandbox: bool,
     build: bool,
@@ -72,16 +73,13 @@ pub async fn add_subcommand(
     validate_build_sandbox_conflict(build, sandbox, "add", Some("[NAMES]"), None);
     unsupported_build_error(build, "add", Some("[NAMES]"));
 
-    let mut scripts = scripts
-        .into_iter()
-        .map(|(k, v)| (k, v.into()))
-        .collect::<HashMap<String, String>>();
+    let mut scripts = scripts.into_iter().collect::<HashMap<String, String>>();
 
     if let Some(start) = start {
-        scripts.insert(START_SCRIPT_NAME.to_string(), start.into());
+        scripts.insert(START_SCRIPT_NAME.to_string(), start);
     }
 
-    let component = Component::Sandbox {
+    let component = Component::Sandbox(Box::new(SandboxConfig {
         image,
         memory,
         cpus,
@@ -96,7 +94,7 @@ pub async fn add_subcommand(
         imports: imports.into_iter().map(|(k, v)| (k, v.into())).collect(),
         exports: exports.into_iter().map(|(k, v)| (k, v.into())).collect(),
         scope,
-    };
+    }));
 
     config::add(&names, &component, path.as_deref(), config.as_deref()).await?;
 
@@ -175,7 +173,7 @@ pub async fn run_subcommand(
 
     let (path, config) = parse_file_path(file);
     sandbox::run(
-        &sandbox,
+        sandbox,
         script,
         path.as_deref(),
         config.as_deref(),
@@ -218,6 +216,7 @@ pub async fn script_run_subcommand(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn exe_subcommand(
     name: String,
     cpus: Option<u8>,
@@ -469,6 +468,7 @@ pub async fn self_subcommand(action: SelfAction) -> MicrosandboxCliResult<()> {
 }
 
 /// Handles the install subcommand for installing sandbox scripts from images
+#[allow(clippy::too_many_arguments)]
 pub async fn install_subcommand(
     name: String,
     alias: Option<String>,

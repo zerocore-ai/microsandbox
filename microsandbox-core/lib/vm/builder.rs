@@ -9,7 +9,10 @@ use crate::{
     config::{EnvPair, NetworkScope, PathPair, PortPair},
 };
 
-use super::{LinuxRlimit, LogLevel, MicroVm, MicroVmConfig, Rootfs};
+use super::{
+    LinuxRlimit,
+    microvm::{LogLevel, MicroVm, MicroVmConfig, Rootfs},
+};
 
 //--------------------------------------------------------------------------------------------------
 // Types

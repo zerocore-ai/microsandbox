@@ -26,20 +26,20 @@ path = "lib/lib.rs"
 [dependencies]
 anyhow.workspace = true
 axum.workspace = true
+chrono.workspace = true
+clap.workspace = true
+console.workspace = true
 microsandbox-core = { workspace = true, features = ["cli"] }
 microsandbox-server = { workspace = true, features = ["cli"] }
 microsandbox-utils = { workspace = true }
-clap.workspace = true
-typed-path.workspace = true
-chrono.workspace = true
-tokio.workspace = true
-tracing.workspace = true
-tracing-subscriber.workspace = true
-which = "7.0"
-console.workspace = true
 pretty-error-debug.workspace = true
 thiserror.workspace = true
+tokio.workspace = true
 tower-http.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+typed-path.workspace = true
+which.workspace = true
 
 [dev-dependencies]
-serial_test = "3.2.0"
+serial_test.workspace = true

@@ -89,7 +89,7 @@ pub fn create_spinner(
         MULTI_PROGRESS.add(pb)
     };
 
-    let style = if let Some(_) = len {
+    let style = if len.is_some() {
         ProgressStyle::with_template("{spinner} {msg} {pos:.bold} / {len:.dim}")
             .unwrap()
             .tick_strings(&*TICK_STRINGS)

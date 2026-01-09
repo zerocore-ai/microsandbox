@@ -93,10 +93,12 @@ where
         platform: Platform,
         layer_ops: T,
     ) -> MicrosandboxResult<Self> {
-        let mut config = OciClientConfig::default();
-        config.platform_resolver = Some(Box::new(move |manifests| {
-            Self::resolve_digest_for_platform(platform.clone(), manifests)
-        }));
+        let config = OciClientConfig {
+            platform_resolver: Some(Box::new(move |manifests| {
+                Self::resolve_digest_for_platform(platform.clone(), manifests)
+            })),
+            ..Default::default()
+        };
 
         Ok(Self {
             client: OciClient::new(config),
@@ -160,7 +162,7 @@ where
             pb.set_style(style);
             // first 8 chars of sha part
             let digest_short = digest.digest().get(..8).unwrap_or("");
-            pb.set_prefix(format!("{}", digest_short));
+            pb.set_prefix(digest_short.to_string());
             pb.clone()
         };
 
@@ -203,7 +205,7 @@ where
 
         let mut file = file.open(&download_path).await?;
         let mut stream = self
-            .fetch_digest_blob(&reference, digest, downloaded_size, None)
+            .fetch_digest_blob(reference, digest, downloaded_size, None)
             .await?;
 
         // Write the stream to the file
@@ -319,7 +321,7 @@ where
                 let diff_id = diff_id.to_string();
                 let digest = Digest::from_str(&layer.digest)?;
                 let blob = self
-                    .download_image_blob(&reference, &digest, layer.size as u64)
+                    .download_image_blob(reference, &digest, layer.size as u64)
                     .await?;
 
                 let db_layer_id = match &blob {
@@ -336,7 +338,7 @@ where
                             ?digest,
                             "Layer exists in global cache. Checking database as well"
                         );
-                        db::get_layer_by_digest(&self.db, &digest.to_string())
+                        db::get_layer_by_digest(&self.db, digest.as_ref())
                             .await?
                             .map(|l| l.id)
                     }
@@ -417,9 +419,9 @@ where
     /// * `reference` - The reference to the repository and tag
     /// * `digest` - The digest of the layer to download
     /// * `offset` - The position in the entire blob to resume from.
-    ///              If `0` is provided, reading would commence from first byte in the blob.
+    ///   If `0` is provided, reading would commence from first byte in the blob.
     /// * `length` - The number of bytes to fetch from the `offset`.
-    ///              If `None`, it'd be read to the end.
+    ///   If `None`, it'd be read to the end.
     ///
     /// ## Returns
     /// Returns a stream of the blob for efficient processing.
@@ -436,7 +438,7 @@ where
         );
 
         let layer = LayerDescriptor {
-            digest: &digest.to_string(),
+            digest: digest.as_ref(),
             urls: &None,
         };
 

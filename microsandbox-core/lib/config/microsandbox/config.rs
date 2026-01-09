@@ -353,7 +353,7 @@ impl Sandbox {
     /// Validates the configuration.
     pub fn validate(&self) -> MicrosandboxResult<()> {
         // Error if start and exec are both not defined
-        if self.scripts.get(START_SCRIPT_NAME).is_none()
+        if !self.scripts.contains_key(START_SCRIPT_NAME)
             && self.command.is_empty()
             && self.shell.is_none()
         {
@@ -405,7 +405,7 @@ impl TryFrom<String> for NetworkScope {
     type Error = MicrosandboxError;
 
     fn try_from(s: String) -> Result<Self, Self::Error> {
-        Ok(NetworkScope::try_from(s.as_str())?)
+        NetworkScope::try_from(s.as_str())
     }
 }
 

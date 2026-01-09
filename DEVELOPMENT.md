@@ -92,6 +92,29 @@ To see all available make targets and their descriptions:
 make help
 ```
 
+## 🔍 Code Quality
+
+### Pre-commit Hooks
+
+We use [pre-commit](https://pre-commit.com/) to automatically run code quality checks before each commit. This ensures consistent code formatting and catches common issues early.
+
+Install pre-commit:
+
+```bash
+# Using pip
+pip install pre-commit
+
+# Using Homebrew (macOS)
+brew install pre-commit
+```
+
+After cloning the repository, install the git hooks:
+
+```bash
+# Install pre-commit hooks
+pre-commit install
+```
+
 ## 🧪 Testing
 
 ### Running Tests

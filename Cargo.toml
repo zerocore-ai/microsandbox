@@ -1,13 +1,13 @@
 [workspace]
+resolver = "3"
+exclude = ["sdk/rust"]
 members = [
-    "microsandbox-utils",
+    "microsandbox-cli",
     "microsandbox-core",
     "microsandbox-portal",
     "microsandbox-server",
-    "microsandbox-cli",
+    "microsandbox-utils",
 ]
-exclude = ["sdk/rust"]
-resolver = "2"
 
 [workspace.package]
 authors = ["Team MicroSandbox <team@microsandbox.dev>"]
@@ -20,69 +20,79 @@ edition = "2024"
 codegen-units = 1
 
 [workspace.dependencies]
-async-stream = "0.3"
-async-trait = "0.1"
-base64 = "0.22"
-dirs = "6.0"
-hex = "0.4"
-libc = "0.2"
-nix = "0.29" # Cannot upgrade to 0.30 because pty no longer works correctly. Yet to investigate properly.
-axum = "0.8"
-bytes = "1.9"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-structstruck = "0.5"
-xattr = "1.3"
-sha2 = "0.10"
-thiserror = "2.0"
 anyhow = "1.0"
-futures = "0.3"
-tokio = { version = "1.42", features = ["full"] }
-tokio-util = { version = "0.7", features = ["io"] }
-dotenvy = "0.15"
-tracing = "0.1"
-tracing-subscriber = "0.3"
-clap = { version = "4.5", features = ["color", "derive"] }
-getset = "0.1"
-procspawn = "1.0"
-rand = "0.9"
-reqwest = { version = "0.12", features = ["stream", "json"] }
-reqwest-middleware = "0.3" # Cannot upgrade to 0.4 due to https://github.com/TrueLayer/reqwest-middleware/issues/204
-reqwest-retry = "0.6"      # Cannot upgrade to 0.7 due to https://github.com/TrueLayer/reqwest-middleware/issues/204
-microsandbox-utils = { version = "0.2.6", path = "./microsandbox-utils" }
-microsandbox-core = { version = "0.2.6", path = "./microsandbox-core" }
-microsandbox-server = { version = "0.2.6", path = "./microsandbox-server" }
-multihash = "0.19"
-multihash-codetable = "0.1"
-chrono = { version = "0.4", features = ["serde"] }
-criterion = "0.5"
-tempfile = "3.15"
-test-log = "0.2"
-typed-path = "0.11"
-tower = { version = "0.5" }
-tower-http = { version = "0.6.2", features = ["cors"] }
-toml = "0.8"
-typed-builder = "0.21"
-uuid = { version = "1.11", features = ["v4"] }
-pretty-error-debug = "0.3"
-sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio-rustls"] }
-serde_yaml = "0.9"
-regex = "1.10"
-cfg-if = "1.0"
-nfsserve = "0.10"
-intaglio = "1.10"
-uzers = "0.12"
-console = "0.15"
-indicatif = "0.17"
-jsonwebtoken = "9.3"
-crossterm = { version = "0.29.0", features = ["events"] }
-once_cell = "1.19"
-tar = "0.4"
-flate2 = "1.0"
-oci-client = "0.15"
 astral-tokio-tar = "0.5.6"
 async-compression = "0.4"
+async-stream = "0.3"
+async-trait = "0.1"
+axum = "0.8"
+base64 = "0.22"
+bytes = "1.9"
+cfg-if = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+clap = { version = "4.5", features = ["color", "derive"] }
+console = "0.16"
+criterion = "0.8"
+crossterm = { version = "0.29.0", features = ["events"] }
+dirs = "6.0"
+dotenvy = "0.15"
+flate2 = "1.0"
+futures = "0.3"
+getset = "0.1"
+hex = "0.4"
+indicatif = "0.18"
+intaglio = "1.10"
+ipnetwork = { version = "0.21.0", features = ["serde"] }
+jsonwebtoken = "9.3"
+libc = "0.2"
+microsandbox-core = { version = "0.2.6", path = "./microsandbox-core" }
+microsandbox-server = { version = "0.2.6", path = "./microsandbox-server" }
+microsandbox-utils = { version = "0.2.6", path = "./microsandbox-utils" }
+multihash = "0.19"
+multihash-codetable = "0.1"
+nfsserve = "0.10"
+nix = "0.30"                                                                # Cannot upgrade to 0.30 because pty no longer works correctly. Yet to investigate properly.
+nondestructive = { version = "0.0.28", features = ["serde"] }
+oci-client = "0.15"
+oci-spec = "0.8"
+once_cell = "1.19"
+pin-project-lite = "0.2.15"
+pretty-error-debug = "0.3"
+procspawn = "1.0"
+psutil = "3.3.0"
+rand = "0.9"
+regex = "1.10"
+reqwest = { version = "0.13", features = ["json", "stream"] }
+reqwest-middleware = "0.3"                                                  # Cannot upgrade to 0.4 due to https://github.com/TrueLayer/reqwest-middleware/issues/204
+reqwest-retry = "0.8"                                                       # Cannot upgrade to 0.7 due to https://github.com/TrueLayer/reqwest-middleware/issues/204
+scopeguard = "1.2"
+semver = { version = "1.0.24", features = ["serde"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+serial_test = "3.2.0"
+sha2 = "0.10"
+sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "sqlite"] }
+structstruck = "0.5"
+tar = "0.4"
+tempfile = "3.15"
+test-log = "0.2"
+thiserror = "2.0"
+tokio = { version = "1.42", features = ["full"] }
+tokio-util = { version = "0.7", features = ["io"] }
+toml = "0.9"
+tower = { version = "0.5" }
+tower-http = { version = "0.6.2", features = ["cors"] }
+tracing = "0.1"
+tracing-subscriber = "0.3"
+typed-builder = "0.23"
+typed-path = "0.12"
+uuid = { version = "1.11", features = ["v4"] }
+uzers = "0.12"
+walkdir = "2.4"
+which = "8"
+xattr = "1.3"
 
 [patch.crates-io]
+oci-client = { git = "https://github.com/toksdotdev/rust-oci-client.git", branch = "toks/string-impl-for-enums" }
 oci-spec = { git = "https://github.com/youki-dev/oci-spec-rs.git" }
-oci-client = { git = "https://github.com/toksdotdev/rust-oci-client.git", branch = "toks/string-impl-for-enums"}

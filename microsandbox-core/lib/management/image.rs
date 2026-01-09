@@ -82,7 +82,8 @@ const EXTRACT_LAYERS_MSG: &str = "Extracting layers";
 /// }
 /// ```
 pub async fn pull(image: Reference, layer_output_dir: Option<PathBuf>) -> MicrosandboxResult<()> {
-    let temp_download_dir = tempdir()?.into_path();
+    let temp_download_dir = tempdir()?;
+    let temp_download_dir = temp_download_dir.path().to_path_buf();
     tracing::info!(
         "temporary download directory: {}",
         temp_download_dir.display()
@@ -126,7 +127,7 @@ where
     fs::create_dir_all(&output_layers_dir).await?;
 
     // Check if we need to pull the image
-    if check_image_layers(&pool, image, &output_layers_dir).await? {
+    if check_image_layers(pool, image, &output_layers_dir).await? {
         tracing::info!("image {} and all its layers exist, skipping pull", image);
         return Ok(());
     }
@@ -262,20 +263,23 @@ async fn check_image_layers(
 /// Helper function to get full mode with file type bits
 fn get_full_mode(entry_type: &tokio_tar::EntryType, permission_bits: u32) -> u32 {
     let file_type_bits = if entry_type.is_file() {
-        libc::S_IFREG as u32
+        libc::S_IFREG
     } else if entry_type.is_dir() {
-        libc::S_IFDIR as u32
+        libc::S_IFDIR
     } else if entry_type.is_symlink() {
-        libc::S_IFLNK as u32
+        libc::S_IFLNK
     } else if entry_type.is_block_special() {
-        libc::S_IFBLK as u32
+        libc::S_IFBLK
     } else if entry_type.is_character_special() {
-        libc::S_IFCHR as u32
+        libc::S_IFCHR
     } else if entry_type.is_fifo() {
-        libc::S_IFIFO as u32
+        libc::S_IFIFO
     } else {
         0 // Unknown type
     };
+
+    #[cfg(target_os = "macos")]
+    let file_type_bits = file_type_bits as u32;
 
     file_type_bits | permission_bits
 }
@@ -631,7 +635,7 @@ async fn extract_layer(
         } else {
             &file_name[..8.min(file_name.len())]
         };
-        pb.set_prefix(format!("{}", digest_short));
+        pb.set_prefix(digest_short.to_string());
 
         let layer_path_clone = layer_path.to_path_buf();
         let extract_dir_clone = extract_dir.clone();

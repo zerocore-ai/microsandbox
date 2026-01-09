@@ -68,6 +68,7 @@ pub struct MicroVmMonitor {
 
 impl MicroVmMonitor {
     /// Create a new MicroVM monitor
+    #[allow(clippy::too_many_arguments)]
     pub async fn new(
         supervisor_pid: u32,
         sandbox_db_path: impl AsRef<Path>,
@@ -93,14 +94,14 @@ impl MicroVmMonitor {
     }
 
     fn restore_terminal_settings(&mut self) {
-        if let Some(original_term) = self.original_term.take() {
-            if let Err(e) = nix::sys::termios::tcsetattr(
+        if let Some(original_term) = self.original_term.take()
+            && let Err(e) = nix::sys::termios::tcsetattr(
                 unsafe { BorrowedFd::borrow_raw(libc::STDIN_FILENO) },
                 nix::sys::termios::SetArg::TCSANOW,
                 &original_term,
-            ) {
-                tracing::warn!(error = %e, "failed to restore terminal settings in restore_terminal_settings");
-            }
+            )
+        {
+            tracing::warn!(error = %e, "failed to restore terminal settings in restore_terminal_settings");
         }
     }
 

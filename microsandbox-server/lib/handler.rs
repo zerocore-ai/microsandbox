@@ -459,7 +459,7 @@ pub async fn sandbox_start_impl(
     }
 
     let config_map = config_yaml.as_mapping_mut().unwrap();
-    if !config_map.contains_key(&serde_yaml::Value::String("sandboxes".to_string())) {
+    if !config_map.contains_key(serde_yaml::Value::String("sandboxes".to_string())) {
         config_map.insert(
             serde_yaml::Value::String("sandboxes".to_string()),
             serde_yaml::Value::Mapping(serde_yaml::Mapping::new()),
@@ -478,123 +478,123 @@ pub async fn sandbox_start_impl(
     let sandboxes_map = sandboxes_value.as_mapping_mut().unwrap();
 
     // If config is provided and we have an image, update the sandbox configuration
-    if let Some(config) = &params.config {
-        if config.image.is_some() {
-            // Create or update sandbox entry
-            let mut sandbox_map = serde_yaml::Mapping::new();
+    if let Some(config) = &params.config
+        && config.image.is_some()
+    {
+        // Create or update sandbox entry
+        let mut sandbox_map = serde_yaml::Mapping::new();
 
-            // Set required image field
-            if let Some(image) = &config.image {
-                sandbox_map.insert(
-                    serde_yaml::Value::String("image".to_string()),
-                    serde_yaml::Value::String(image.clone()),
-                );
-            }
-
-            // Set optional fields
-            if let Some(memory) = config.memory {
-                sandbox_map.insert(
-                    serde_yaml::Value::String("memory".to_string()),
-                    serde_yaml::Value::Number(serde_yaml::Number::from(memory)),
-                );
-            }
-
-            if let Some(cpus) = config.cpus {
-                sandbox_map.insert(
-                    serde_yaml::Value::String("cpus".to_string()),
-                    serde_yaml::Value::Number(serde_yaml::Number::from(cpus)),
-                );
-            }
-
-            if !config.volumes.is_empty() {
-                let volumes_array = config
-                    .volumes
-                    .iter()
-                    .map(|v| serde_yaml::Value::String(v.clone()))
-                    .collect::<Vec<_>>();
-                sandbox_map.insert(
-                    serde_yaml::Value::String("volumes".to_string()),
-                    serde_yaml::Value::Sequence(volumes_array),
-                );
-            }
-
-            if !config.ports.is_empty() {
-                let ports_array = config
-                    .ports
-                    .iter()
-                    .map(|p| serde_yaml::Value::String(p.clone()))
-                    .collect::<Vec<_>>();
-                sandbox_map.insert(
-                    serde_yaml::Value::String("ports".to_string()),
-                    serde_yaml::Value::Sequence(ports_array),
-                );
-            }
-
-            if !config.envs.is_empty() {
-                let envs_array = config
-                    .envs
-                    .iter()
-                    .map(|e| serde_yaml::Value::String(e.clone()))
-                    .collect::<Vec<_>>();
-                sandbox_map.insert(
-                    serde_yaml::Value::String("envs".to_string()),
-                    serde_yaml::Value::Sequence(envs_array),
-                );
-            }
-
-            if !config.depends_on.is_empty() {
-                let depends_on_array = config
-                    .depends_on
-                    .iter()
-                    .map(|d| serde_yaml::Value::String(d.clone()))
-                    .collect::<Vec<_>>();
-                sandbox_map.insert(
-                    serde_yaml::Value::String("depends_on".to_string()),
-                    serde_yaml::Value::Sequence(depends_on_array),
-                );
-            }
-
-            if let Some(workdir) = &config.workdir {
-                sandbox_map.insert(
-                    serde_yaml::Value::String("workdir".to_string()),
-                    serde_yaml::Value::String(workdir.clone()),
-                );
-            }
-
-            if let Some(shell) = &config.shell {
-                sandbox_map.insert(
-                    serde_yaml::Value::String("shell".to_string()),
-                    serde_yaml::Value::String(shell.clone()),
-                );
-            }
-
-            if !config.scripts.is_empty() {
-                let mut scripts_map = serde_yaml::Mapping::new();
-                for (script_name, script) in &config.scripts {
-                    scripts_map.insert(
-                        serde_yaml::Value::String(script_name.clone()),
-                        serde_yaml::Value::String(script.clone()),
-                    );
-                }
-                sandbox_map.insert(
-                    serde_yaml::Value::String("scripts".to_string()),
-                    serde_yaml::Value::Mapping(scripts_map),
-                );
-            }
-
-            if let Some(exec) = &config.exec {
-                sandbox_map.insert(
-                    serde_yaml::Value::String("exec".to_string()),
-                    serde_yaml::Value::String(exec.clone()),
-                );
-            }
-
-            // Replace or add the sandbox in the config
-            sandboxes_map.insert(
-                serde_yaml::Value::String(sandbox.clone()),
-                serde_yaml::Value::Mapping(sandbox_map),
+        // Set required image field
+        if let Some(image) = &config.image {
+            sandbox_map.insert(
+                serde_yaml::Value::String("image".to_string()),
+                serde_yaml::Value::String(image.clone()),
             );
         }
+
+        // Set optional fields
+        if let Some(memory) = config.memory {
+            sandbox_map.insert(
+                serde_yaml::Value::String("memory".to_string()),
+                serde_yaml::Value::Number(serde_yaml::Number::from(memory)),
+            );
+        }
+
+        if let Some(cpus) = config.cpus {
+            sandbox_map.insert(
+                serde_yaml::Value::String("cpus".to_string()),
+                serde_yaml::Value::Number(serde_yaml::Number::from(cpus)),
+            );
+        }
+
+        if !config.volumes.is_empty() {
+            let volumes_array = config
+                .volumes
+                .iter()
+                .map(|v| serde_yaml::Value::String(v.clone()))
+                .collect::<Vec<_>>();
+            sandbox_map.insert(
+                serde_yaml::Value::String("volumes".to_string()),
+                serde_yaml::Value::Sequence(volumes_array),
+            );
+        }
+
+        if !config.ports.is_empty() {
+            let ports_array = config
+                .ports
+                .iter()
+                .map(|p| serde_yaml::Value::String(p.clone()))
+                .collect::<Vec<_>>();
+            sandbox_map.insert(
+                serde_yaml::Value::String("ports".to_string()),
+                serde_yaml::Value::Sequence(ports_array),
+            );
+        }
+
+        if !config.envs.is_empty() {
+            let envs_array = config
+                .envs
+                .iter()
+                .map(|e| serde_yaml::Value::String(e.clone()))
+                .collect::<Vec<_>>();
+            sandbox_map.insert(
+                serde_yaml::Value::String("envs".to_string()),
+                serde_yaml::Value::Sequence(envs_array),
+            );
+        }
+
+        if !config.depends_on.is_empty() {
+            let depends_on_array = config
+                .depends_on
+                .iter()
+                .map(|d| serde_yaml::Value::String(d.clone()))
+                .collect::<Vec<_>>();
+            sandbox_map.insert(
+                serde_yaml::Value::String("depends_on".to_string()),
+                serde_yaml::Value::Sequence(depends_on_array),
+            );
+        }
+
+        if let Some(workdir) = &config.workdir {
+            sandbox_map.insert(
+                serde_yaml::Value::String("workdir".to_string()),
+                serde_yaml::Value::String(workdir.clone()),
+            );
+        }
+
+        if let Some(shell) = &config.shell {
+            sandbox_map.insert(
+                serde_yaml::Value::String("shell".to_string()),
+                serde_yaml::Value::String(shell.clone()),
+            );
+        }
+
+        if !config.scripts.is_empty() {
+            let mut scripts_map = serde_yaml::Mapping::new();
+            for (script_name, script) in &config.scripts {
+                scripts_map.insert(
+                    serde_yaml::Value::String(script_name.clone()),
+                    serde_yaml::Value::String(script.clone()),
+                );
+            }
+            sandbox_map.insert(
+                serde_yaml::Value::String("scripts".to_string()),
+                serde_yaml::Value::Mapping(scripts_map),
+            );
+        }
+
+        if let Some(exec) = &config.exec {
+            sandbox_map.insert(
+                serde_yaml::Value::String("exec".to_string()),
+                serde_yaml::Value::String(exec.clone()),
+            );
+        }
+
+        // Replace or add the sandbox in the config
+        sandboxes_map.insert(
+            serde_yaml::Value::String(sandbox.clone()),
+            serde_yaml::Value::Mapping(sandbox_map),
+        );
     }
 
     // Assign a port for this sandbox
@@ -610,7 +610,7 @@ pub async fn sandbox_start_impl(
 
     // Get the specific sandbox configuration
     let sandbox_config = sandboxes_map
-        .get_mut(&serde_yaml::Value::String(sandbox.clone()))
+        .get_mut(serde_yaml::Value::String(sandbox.clone()))
         .ok_or_else(|| {
             ServerError::InternalError(format!("Sandbox '{}' not found in configuration", sandbox))
         })?
@@ -642,8 +642,7 @@ pub async fn sandbox_start_impl(
         }
     } else {
         // Create a new ports list with the portal port mapping
-        let mut ports_seq = serde_yaml::Sequence::new();
-        ports_seq.push(serde_yaml::Value::String(portal_port_mapping));
+        let ports_seq = vec![serde_yaml::Value::String(portal_port_mapping)];
         sandbox_config.insert(ports_key, serde_yaml::Value::Sequence(ports_seq));
     }
 
@@ -718,7 +717,7 @@ pub async fn sandbox_start_impl(
 /// Polls the sandbox until it's verified to be running
 async fn poll_sandbox_until_running(
     sandbox_name: &str,
-    namespace_dir: &PathBuf,
+    namespace_dir: &std::path::Path,
     config_file: &str,
 ) -> ServerResult<()> {
     const POLL_INTERVAL: Duration = Duration::from_millis(20);
@@ -735,15 +734,15 @@ async fn poll_sandbox_until_running(
         .map_err(|e| ServerError::InternalError(format!("Failed to get sandbox status: {}", e)))?;
 
         // Find our sandbox in the results
-        if let Some(status) = statuses.iter().find(|s| s.name == sandbox_name) {
-            if status.running {
-                // Sandbox is running, we're done
-                debug!(
-                    "Sandbox {} is running (verified on attempt {})",
-                    sandbox_name, attempt
-                );
-                return Ok(());
-            }
+        if let Some(status) = statuses.iter().find(|s| s.name == sandbox_name)
+            && status.running
+        {
+            // Sandbox is running, we're done
+            debug!(
+                "Sandbox {} is running (verified on attempt {})",
+                sandbox_name, attempt
+            );
+            return Ok(());
         }
 
         // Sleep before the next attempt

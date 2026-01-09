@@ -132,10 +132,9 @@ pub async fn start(
         MSBSERVER_EXE_ENV_VAR,
         &*DEFAULT_MSBSERVER_EXE_PATH,
     )
-    .map_err(|e| {
+    .inspect_err(|_e| {
         #[cfg(feature = "cli")]
         term::finish_with_error(&start_server_sp);
-        e
     })?;
 
     let mut command = Command::new(msbserver_path);
@@ -284,7 +283,7 @@ pub async fn start(
     // Wait for either child process to exit or signal to be received
     tokio::select! {
         status = child.wait() => {
-            if !status.as_ref().map_or(false, |s| s.success()) {
+            if !status.as_ref().is_ok_and(|s| s.success()) {
                 tracing::error!(
                     "child process — sandbox server — exited with status: {:?}",
                     status

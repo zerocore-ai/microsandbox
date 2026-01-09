@@ -13,18 +13,18 @@ path = "lib/lib.rs"
 
 [dependencies]
 anyhow.workspace = true
-thiserror.workspace = true
-typed-path.workspace = true
-pretty-error-debug.workspace = true
-tokio.workspace = true
-futures.workspace = true
 async-trait.workspace = true
-nix = { workspace = true, features = ["process", "signal", "term", "fs"] }
-tracing.workspace = true
-libc.workspace = true
-indicatif.workspace = true
 console.workspace = true
 dirs.workspace = true
+futures.workspace = true
+indicatif.workspace = true
+libc.workspace = true
+nix = { workspace = true, features = ["fs", "process", "signal", "term"] }
+pretty-error-debug.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+typed-path.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

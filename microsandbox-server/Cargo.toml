@@ -11,30 +11,30 @@ edition.workspace = true
 path = "lib/lib.rs"
 
 [dependencies]
-tower.workspace = true
-axum = { workspace = true, features = ["macros"] }
 anyhow.workspace = true
+axum = { workspace = true, features = ["macros"] }
 base64.workspace = true
-tracing.workspace = true
-serde_json.workspace = true
-serde.workspace = true
-serde_yaml.workspace = true
-tokio.workspace = true
-tokio-util.workspace = true
-getset.workspace = true
-thiserror.workspace = true
-pretty-error-debug.workspace = true
-indicatif = { workspace = true, optional = true }
+chrono.workspace = true
 console = { workspace = true, optional = true }
-microsandbox-utils.workspace = true
+getset.workspace = true
+indicatif = { workspace = true, optional = true }
+jsonwebtoken.workspace = true
 libc.workspace = true
+microsandbox-core.workspace = true
+microsandbox-utils.workspace = true
+once_cell.workspace = true
+pretty-error-debug.workspace = true
 rand.workspace = true
 reqwest.workspace = true
-chrono.workspace = true
-jsonwebtoken.workspace = true
-microsandbox-core.workspace = true
-once_cell.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_yaml.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+tower.workspace = true
+tracing.workspace = true
 
 [features]
+cli = ["console", "indicatif"]
 default = []
-cli = ["indicatif", "console"]

@@ -113,6 +113,8 @@ async fn sandbox_run_impl(_state: SharedState, params: Value) -> Result<Value, P
                 }
                 _ => format!("Unsupported language: {}", params.language),
             };
+
+            #[allow(clippy::needless_return)]
             return Err(PortalError::JsonRpc(error_msg));
         }
     };

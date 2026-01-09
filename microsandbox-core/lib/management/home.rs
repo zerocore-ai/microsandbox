@@ -167,6 +167,7 @@ pub async fn clean(force: bool) -> MicrosandboxResult<()> {
 /// # Ok(())
 /// # }
 /// ```
+#[allow(clippy::too_many_arguments)]
 pub async fn install(
     image: &Reference,
     script: Option<&str>,
@@ -411,7 +412,7 @@ fn extract_name_from_reference(reference: &Reference) -> String {
     let image_str = reference.to_string();
 
     // Split the image string by '/' and take the last part
-    let name_with_tag = image_str.split('/').last().unwrap_or(&image_str);
+    let name_with_tag = image_str.rsplit('/').next().unwrap_or(&image_str);
 
     // Split by ':' to remove the tag and take the first part
     name_with_tag

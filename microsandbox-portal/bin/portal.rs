@@ -8,7 +8,6 @@ use clap::Parser;
 use microsandbox_utils::DEFAULT_PORTAL_GUEST_PORT;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::{net::TcpListener, signal};
-use tracing;
 
 use microsandbox_portal::{
     portal::repl::{EngineHandle, start_engines},

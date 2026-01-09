@@ -4,7 +4,7 @@ use nix::{
     unistd::Pid,
 };
 use std::{
-    os::unix::io::{AsRawFd, FromRawFd, IntoRawFd},
+    os::unix::io::{FromRawFd, IntoRawFd},
     path::PathBuf,
     process::Stdio,
 };
@@ -103,11 +103,10 @@ where
             tracing::info!("running in an interactive terminal");
             // Create a new pseudo terminal and set master to non-blocking mode
             let pty = openpty(None, None)?;
-            let master_fd = pty.master.as_raw_fd();
             {
-                let flags = OFlag::from_bits_truncate(fcntl(master_fd, FcntlArg::F_GETFL)?);
+                let flags = OFlag::from_bits_truncate(fcntl(&pty.master, FcntlArg::F_GETFL)?);
                 let new_flags = flags | OFlag::O_NONBLOCK;
-                fcntl(master_fd, FcntlArg::F_SETFL(new_flags))?;
+                fcntl(&pty.master, FcntlArg::F_SETFL(new_flags))?;
             }
 
             // Clone the slave for stdin, stdout, and stderr
@@ -140,10 +139,11 @@ where
 
             // Set up master file handles for asynchronous I/O
             let master_fd_owned = pty.master;
-            let master_write_fd = nix::unistd::dup(master_fd_owned.as_raw_fd())?;
+            let master_write_fd = nix::unistd::dup(&master_fd_owned)?;
             let master_read_file =
                 unsafe { std::fs::File::from_raw_fd(master_fd_owned.into_raw_fd()) };
-            let master_write_file = unsafe { std::fs::File::from_raw_fd(master_write_fd) };
+            let master_write_file =
+                unsafe { std::fs::File::from_raw_fd(master_write_fd.into_raw_fd()) };
 
             let master_read = AsyncFd::new(master_read_file)?;
             let master_write = File::from_std(master_write_file);
@@ -228,14 +228,13 @@ where
 
                 tracing::info!("received SIGTERM signal");
 
-                if let Some(pid) = self.child_pid.take() {
-                    if let Err(e) = nix::sys::signal::kill(Pid::from_raw(pid as i32), nix::sys::signal::Signal::SIGTERM) {
-                        tracing::error!(
-                            "failed to send SIGTERM to process {}: {}",
-                            pid,
-                            e
-                        );
-                    }
+                if let Some(pid) = self.child_pid.take()
+                    && let Err(e) = nix::sys::signal::kill(Pid::from_raw(pid as i32), nix::sys::signal::Signal::SIGTERM) {
+                    tracing::error!(
+                        "failed to send SIGTERM to process {}: {}",
+                        pid,
+                        e
+                    );
                 }
 
                 // Wait for child to exit after sending signal
@@ -252,14 +251,13 @@ where
 
                 tracing::info!("received SIGINT signal");
 
-                if let Some(pid) = self.child_pid.take() {
-                    if let Err(e) = nix::sys::signal::kill(Pid::from_raw(pid as i32), nix::sys::signal::Signal::SIGTERM) {
-                        tracing::error!(
-                            "failed to send SIGTERM to process {}: {}",
-                            pid,
-                            e
-                        );
-                    }
+                if let Some(pid) = self.child_pid.take()
+                    && let Err(e) = nix::sys::signal::kill(Pid::from_raw(pid as i32), nix::sys::signal::Signal::SIGTERM) {
+                    tracing::error!(
+                        "failed to send SIGTERM to process {}: {}",
+                        pid,
+                        e
+                    );
                 }
 
                 // Wait for child to exit after sending signal

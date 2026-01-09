@@ -26,52 +26,56 @@ use super::db;
 //--------------------------------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
+/// Configuration for a sandbox component.
+pub struct SandboxConfig {
+    /// The image to use for the sandbox.
+    pub image: String,
+
+    /// The amount of memory in MiB to use.
+    pub memory: Option<u32>,
+
+    /// The number of CPUs to use.
+    pub cpus: Option<u32>,
+
+    /// The volumes to mount.
+    pub volumes: Vec<String>,
+
+    /// The ports to expose.
+    pub ports: Vec<String>,
+
+    /// The environment variables to use.
+    pub envs: Vec<String>,
+
+    /// The environment file to use.
+    pub env_file: Option<Utf8UnixPathBuf>,
+
+    /// The dependencies to use for the sandbox.
+    pub depends_on: Vec<String>,
+
+    /// The working directory to use for the sandbox.
+    pub workdir: Option<Utf8UnixPathBuf>,
+
+    /// The shell to use for the sandbox.
+    pub shell: Option<String>,
+
+    /// The scripts to use for the sandbox.
+    pub scripts: HashMap<String, String>,
+
+    /// The imports to use for the sandbox.
+    pub imports: HashMap<String, Utf8UnixPathBuf>,
+
+    /// The exports to use for the sandbox.
+    pub exports: HashMap<String, Utf8UnixPathBuf>,
+
+    /// The network scope to use for the sandbox.
+    pub scope: Option<String>,
+}
+
+#[derive(Debug, Clone)]
 /// The component to add to the Microsandbox configuration.
 pub enum Component {
     /// A sandbox component.
-    Sandbox {
-        /// The image to use for the sandbox.
-        image: String,
-
-        /// The amount of memory in MiB to use.
-        memory: Option<u32>,
-
-        /// The number of CPUs to use.
-        cpus: Option<u32>,
-
-        /// The volumes to mount.
-        volumes: Vec<String>,
-
-        /// The ports to expose.
-        ports: Vec<String>,
-
-        /// The environment variables to use.
-        envs: Vec<String>,
-
-        /// The environment file to use.
-        env_file: Option<Utf8UnixPathBuf>,
-
-        /// The dependencies to use for the sandbox.
-        depends_on: Vec<String>,
-
-        /// The working directory to use for the sandbox.
-        workdir: Option<Utf8UnixPathBuf>,
-
-        /// The shell to use for the sandbox.
-        shell: Option<String>,
-
-        /// The scripts to use for the sandbox.
-        scripts: HashMap<String, String>,
-
-        /// The imports to use for the sandbox.
-        imports: HashMap<String, Utf8UnixPathBuf>,
-
-        /// The exports to use for the sandbox.
-        exports: HashMap<String, Utf8UnixPathBuf>,
-
-        /// The network scope to use for the sandbox.
-        scope: Option<String>,
-    },
+    Sandbox(Box<SandboxConfig>),
     /// A build component.
     Build {},
     /// A group component.
@@ -125,23 +129,8 @@ pub async fn add(
         .map_err(|e| MicrosandboxError::ConfigParseError(e.to_string()))?;
 
     for name in names {
-        match component {
-            Component::Sandbox {
-                image,
-                memory,
-                cpus,
-                volumes,
-                ports,
-                envs,
-                env_file,
-                depends_on,
-                workdir,
-                shell,
-                scripts,
-                imports,
-                exports,
-                scope,
-            } => {
+        match &component {
+            Component::Sandbox(config) => {
                 let doc_mut = doc.as_mut();
                 let mut root_mapping = doc_mut.make_mapping();
 
@@ -171,113 +160,113 @@ pub async fn add(
                     .make_mapping();
 
                 // Add image field (required)
-                sandbox_mapping.insert_str("image", image.to_string());
+                sandbox_mapping.insert_str("image", &config.image);
 
                 // Add optional fields
-                if let Some(memory_value) = memory {
-                    sandbox_mapping.insert_u32("memory", *memory_value);
+                if let Some(memory_value) = config.memory {
+                    sandbox_mapping.insert_u32("memory", memory_value);
                 }
 
-                if let Some(cpus_value) = cpus {
-                    sandbox_mapping.insert_u32("cpus", *cpus_value as u32);
+                if let Some(cpus_value) = config.cpus {
+                    sandbox_mapping.insert_u32("cpus", cpus_value);
                 }
 
                 // Add shell (default if not provided)
-                if let Some(shell_value) = shell {
+                if let Some(shell_value) = &config.shell {
                     sandbox_mapping.insert_str("shell", shell_value);
                 } else if sandbox_mapping.get_mut("shell").is_none() {
                     sandbox_mapping.insert_str("shell", DEFAULT_SHELL);
                 }
 
                 // Add volumes if any
-                if !volumes.is_empty() {
+                if !config.volumes.is_empty() {
                     let mut volumes_sequence = sandbox_mapping
                         .insert("volumes", yaml::Separator::Auto)
                         .make_sequence();
 
-                    for volume in volumes {
+                    for volume in &config.volumes {
                         volumes_sequence.push_string(volume);
                     }
                 }
 
                 // Add ports if any
-                if !ports.is_empty() {
+                if !config.ports.is_empty() {
                     let mut ports_sequence = sandbox_mapping
                         .insert("ports", yaml::Separator::Auto)
                         .make_sequence();
 
-                    for port in ports {
+                    for port in &config.ports {
                         ports_sequence.push_string(port);
                     }
                 }
 
                 // Add env vars if any
-                if !envs.is_empty() {
+                if !config.envs.is_empty() {
                     let mut envs_sequence = sandbox_mapping
                         .insert("envs", yaml::Separator::Auto)
                         .make_sequence();
 
-                    for env in envs {
+                    for env in &config.envs {
                         envs_sequence.push_string(env);
                     }
                 }
 
                 // Add env_file if provided
-                if let Some(env_file_path) = env_file {
-                    sandbox_mapping.insert_str("env_file", env_file_path.to_string());
+                if let Some(env_file_path) = &config.env_file {
+                    sandbox_mapping.insert_str("env_file", env_file_path);
                 }
 
                 // Add depends_on if any
-                if !depends_on.is_empty() {
+                if !config.depends_on.is_empty() {
                     let mut depends_on_sequence = sandbox_mapping
                         .insert("depends_on", yaml::Separator::Auto)
                         .make_sequence();
 
-                    for dep in depends_on {
+                    for dep in &config.depends_on {
                         depends_on_sequence.push_string(dep);
                     }
                 }
 
                 // Add workdir if provided
-                if let Some(workdir_path) = workdir {
-                    sandbox_mapping.insert_str("workdir", workdir_path.to_string());
+                if let Some(workdir_path) = &config.workdir {
+                    sandbox_mapping.insert_str("workdir", workdir_path);
                 }
 
                 // Add scripts if any
-                if !scripts.is_empty() {
+                if !config.scripts.is_empty() {
                     let mut scripts_mapping = sandbox_mapping
                         .insert("scripts", yaml::Separator::Auto)
                         .make_mapping();
 
-                    for (script_name, script_content) in scripts {
+                    for (script_name, script_content) in &config.scripts {
                         scripts_mapping.insert_str(script_name, script_content);
                     }
                 }
 
                 // Add imports if any
-                if !imports.is_empty() {
+                if !config.imports.is_empty() {
                     let mut imports_mapping = sandbox_mapping
                         .insert("imports", yaml::Separator::Auto)
                         .make_mapping();
 
-                    for (import_name, import_path) in imports {
-                        imports_mapping.insert_str(import_name, import_path.to_string());
+                    for (import_name, import_path) in &config.imports {
+                        imports_mapping.insert_str(import_name, import_path);
                     }
                 }
 
                 // Add exports if any
-                if !exports.is_empty() {
+                if !config.exports.is_empty() {
                     let mut exports_mapping = sandbox_mapping
                         .insert("exports", yaml::Separator::Auto)
                         .make_mapping();
 
-                    for (export_name, export_path) in exports {
-                        exports_mapping.insert_str(export_name, export_path.to_string());
+                    for (export_name, export_path) in &config.exports {
+                        exports_mapping.insert_str(export_name, export_path);
                     }
                 }
 
                 // Add network scope if provided
-                if let Some(scope_value) = scope {
+                if let Some(scope_value) = &config.scope {
                     let mut network_mapping = sandbox_mapping
                         .insert("network", yaml::Separator::Auto)
                         .make_mapping();
@@ -328,37 +317,33 @@ pub async fn remove(
     let mut doc = yaml::from_slice(config_contents.as_bytes())
         .map_err(|e| MicrosandboxError::ConfigParseError(e.to_string()))?;
 
-    match component_type {
-        ComponentType::Sandbox => {
-            let doc_mut = doc.as_mut();
-            let mut root_mapping =
-                doc_mut
-                    .into_mapping_mut()
-                    .ok_or(MicrosandboxError::ConfigParseError(
-                        "config is not valid. expected an object".to_string(),
-                    ))?;
+    if let ComponentType::Sandbox = component_type {
+        let doc_mut = doc.as_mut();
+        let mut root_mapping =
+            doc_mut
+                .into_mapping_mut()
+                .ok_or(MicrosandboxError::ConfigParseError(
+                    "config is not valid. expected an object".to_string(),
+                ))?;
 
-            // Ensure the "sandboxes" key exists in the root mapping
-            let mut sandboxes_mapping =
-                if let Some(sandboxes_mut) = root_mapping.get_mut("sandboxes") {
-                    // Get the existing sandboxes mapping
-                    sandboxes_mut
-                        .into_mapping_mut()
-                        .ok_or(MicrosandboxError::ConfigParseError(
-                            "sandboxes is not a valid mapping".to_string(),
-                        ))?
-                } else {
-                    // Create a new sandboxes mapping if it doesn't exist
-                    root_mapping
-                        .insert("sandboxes", yaml::Separator::Auto)
-                        .make_mapping()
-                };
+        // Ensure the "sandboxes" key exists in the root mapping
+        let mut sandboxes_mapping = if let Some(sandboxes_mut) = root_mapping.get_mut("sandboxes") {
+            // Get the existing sandboxes mapping
+            sandboxes_mut
+                .into_mapping_mut()
+                .ok_or(MicrosandboxError::ConfigParseError(
+                    "sandboxes is not a valid mapping".to_string(),
+                ))?
+        } else {
+            // Create a new sandboxes mapping if it doesn't exist
+            root_mapping
+                .insert("sandboxes", yaml::Separator::Auto)
+                .make_mapping()
+        };
 
-            for name in names {
-                sandboxes_mapping.remove(name);
-            }
+        for name in names {
+            sandboxes_mapping.remove(name);
         }
-        _ => (),
     }
 
     // Write the modified YAML back to the file, preserving formatting
@@ -391,11 +376,10 @@ pub async fn list(
 ) -> MicrosandboxResult<Vec<String>> {
     let (config, _, _) = load_config(project_dir, config_file).await?;
 
-    match component_type {
-        ComponentType::Sandbox => {
-            return Ok(config.get_sandboxes().keys().cloned().collect());
-        }
-        _ => return Ok(vec![]),
+    if let ComponentType::Sandbox = component_type {
+        Ok(config.get_sandboxes().keys().cloned().collect())
+    } else {
+        Ok(vec![])
     }
 }
 
@@ -437,7 +421,7 @@ pub async fn load_config(
     let canonical_project_dir = fs::canonicalize(project_dir).await?;
 
     // Validate the config file path
-    let config_file = config_file.unwrap_or_else(|| MICROSANDBOX_CONFIG_FILENAME);
+    let config_file = config_file.unwrap_or(MICROSANDBOX_CONFIG_FILENAME);
     let _ = PathSegment::try_from(config_file)?;
     let full_config_path = canonical_project_dir.join(config_file);
 
@@ -480,7 +464,7 @@ pub async fn resolve_config_paths(
     let canonical_project_dir = fs::canonicalize(project_dir).await?;
 
     // Validate the config file path
-    let config_file = config_file.unwrap_or_else(|| MICROSANDBOX_CONFIG_FILENAME);
+    let config_file = config_file.unwrap_or(MICROSANDBOX_CONFIG_FILENAME);
     let _ = PathSegment::try_from(config_file)?;
     let full_config_path = canonical_project_dir.join(config_file);
 
@@ -526,7 +510,7 @@ pub async fn apply_image_defaults(
     oci_db: &Pool<Sqlite>,
 ) -> MicrosandboxResult<()> {
     // Get the image configuration
-    if let Some(config) = db::get_image_config(&oci_db, &reference.to_string()).await? {
+    if let Some(config) = db::get_image_config(oci_db, &reference.to_string()).await? {
         tracing::info!("applying defaults from image configuration");
 
         // Apply working directory if not set in sandbox
@@ -538,21 +522,21 @@ pub async fn apply_image_defaults(
         }
 
         // Combine environment variables
-        if let Some(config_env_json) = config.config_env_json {
-            if let Ok(image_env_vars) = serde_json::from_str::<Vec<String>>(&config_env_json) {
-                let mut image_env_pairs = Vec::new();
-                for env_var in image_env_vars {
-                    if let Ok(env_pair) = env_var.parse::<EnvPair>() {
-                        image_env_pairs.push(env_pair);
-                    }
+        if let Some(config_env_json) = config.config_env_json
+            && let Ok(image_env_vars) = serde_json::from_str::<Vec<String>>(&config_env_json)
+        {
+            let mut image_env_pairs = Vec::new();
+            for env_var in image_env_vars {
+                if let Ok(env_pair) = env_var.parse::<EnvPair>() {
+                    image_env_pairs.push(env_pair);
                 }
-                tracing::debug!("image env vars: {:#?}", image_env_pairs);
-
-                // Combine image env vars with sandbox env vars (image vars come first)
-                let mut combined_env = image_env_pairs;
-                combined_env.extend_from_slice(sandbox_config.get_envs());
-                sandbox_config.envs = combined_env;
             }
+            tracing::debug!("image env vars: {:#?}", image_env_pairs);
+
+            // Combine image env vars with sandbox env vars (image vars come first)
+            let mut combined_env = image_env_pairs;
+            combined_env.extend_from_slice(sandbox_config.get_envs());
+            sandbox_config.envs = combined_env;
         }
 
         // Apply entrypoint and cmd as command if no command is defined
@@ -561,32 +545,29 @@ pub async fn apply_image_defaults(
             let mut has_entrypoint_or_cmd = false;
 
             // Try to use entrypoint and cmd from image config
-            if let Some(entrypoint_json) = &config.config_entrypoint_json {
-                if let Ok(entrypoint) = serde_json::from_str::<Vec<String>>(entrypoint_json) {
-                    if !entrypoint.is_empty() {
-                        has_entrypoint_or_cmd = true;
-                        command_vec = entrypoint;
+            if let Some(entrypoint_json) = &config.config_entrypoint_json
+                && let Ok(entrypoint) = serde_json::from_str::<Vec<String>>(entrypoint_json)
+                && !entrypoint.is_empty()
+            {
+                has_entrypoint_or_cmd = true;
+                command_vec = entrypoint;
 
-                        // Add CMD args if they exist
-                        if let Some(cmd_json) = &config.config_cmd_json {
-                            if let Ok(cmd) = serde_json::from_str::<Vec<String>>(cmd_json) {
-                                if !cmd.is_empty() {
-                                    command_vec.extend(cmd);
-                                }
-                            }
-                        }
+                // Add CMD args if they exist
+                if let Some(cmd_json) = &config.config_cmd_json
+                    && let Ok(cmd) = serde_json::from_str::<Vec<String>>(cmd_json)
+                    && !cmd.is_empty()
+                {
+                    command_vec.extend(cmd);
+                }
 
-                        tracing::debug!("entrypoint exec content: {:?}", command_vec);
-                    }
-                }
-            } else if let Some(cmd_json) = &config.config_cmd_json {
-                if let Ok(cmd) = serde_json::from_str::<Vec<String>>(cmd_json) {
-                    if !cmd.is_empty() {
-                        has_entrypoint_or_cmd = true;
-                        command_vec = cmd;
-                        tracing::debug!("cmd exec content: {:?}", command_vec);
-                    }
-                }
+                tracing::debug!("entrypoint exec content: {:?}", command_vec);
+            } else if let Some(cmd_json) = &config.config_cmd_json
+                && let Ok(cmd) = serde_json::from_str::<Vec<String>>(cmd_json)
+                && !cmd.is_empty()
+            {
+                has_entrypoint_or_cmd = true;
+                command_vec = cmd;
+                tracing::debug!("cmd exec content: {:?}", command_vec);
             }
 
             // If we found an entrypoint or cmd, set it as the command
@@ -601,43 +582,40 @@ pub async fn apply_image_defaults(
         }
 
         // Combine exposed ports
-        if let Some(exposed_ports_json) = &config.config_exposed_ports_json {
-            if let Ok(exposed_ports_map) =
+        if let Some(exposed_ports_json) = &config.config_exposed_ports_json
+            && let Ok(exposed_ports_map) =
                 serde_json::from_str::<serde_json::Value>(exposed_ports_json)
-            {
-                if let Some(exposed_ports_obj) = exposed_ports_map.as_object() {
-                    let mut additional_ports = Vec::new();
+            && let Some(exposed_ports_obj) = exposed_ports_map.as_object()
+        {
+            let mut additional_ports = Vec::new();
 
-                    for port_key in exposed_ports_obj.keys() {
-                        // Port keys in OCI format are like "80/tcp"
-                        if let Some(container_port) = port_key.split('/').next() {
-                            if let Ok(port_num) = container_port.parse::<u16>() {
-                                // Create a port mapping from host port to container port
-                                // We'll use the same port on both sides
-                                let port_pair =
-                                    format!("{}:{}", port_num, port_num).parse::<PortPair>();
-                                if let Ok(port_pair) = port_pair {
-                                    // Only add if not already defined in sandbox config
-                                    let existing_ports = sandbox_config.get_ports();
-                                    if !existing_ports
-                                        .iter()
-                                        .any(|p| p.get_guest() == port_pair.get_guest())
-                                    {
-                                        additional_ports.push(port_pair);
-                                    }
-                                }
-                            }
+            for port_key in exposed_ports_obj.keys() {
+                // Port keys in OCI format are like "80/tcp"
+                if let Some(container_port) = port_key.split('/').next()
+                    && let Ok(port_num) = container_port.parse::<u16>()
+                {
+                    // Create a port mapping from host port to container port
+                    // We'll use the same port on both sides
+                    let port_pair = format!("{}:{}", port_num, port_num).parse::<PortPair>();
+                    if let Ok(port_pair) = port_pair {
+                        // Only add if not already defined in sandbox config
+                        let existing_ports = sandbox_config.get_ports();
+                        if !existing_ports
+                            .iter()
+                            .any(|p| p.get_guest() == port_pair.get_guest())
+                        {
+                            additional_ports.push(port_pair);
                         }
                     }
-
-                    tracing::debug!("additional ports: {:?}", additional_ports);
-
-                    // Add new ports to existing ones
-                    let mut combined_ports = sandbox_config.get_ports().to_vec();
-                    combined_ports.extend(additional_ports);
-                    sandbox_config.ports = combined_ports;
                 }
             }
+
+            tracing::debug!("additional ports: {:?}", additional_ports);
+
+            // Add new ports to existing ones
+            let mut combined_ports = sandbox_config.get_ports().to_vec();
+            combined_ports.extend(additional_ports);
+            sandbox_config.ports = combined_ports;
         }
     }
 

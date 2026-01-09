@@ -82,23 +82,23 @@ impl BiPortMapping {
     /// Insert a mapping, handling any existing mappings for the port or sandbox
     pub fn insert(&mut self, sandbox_key: String, port: u16) {
         // Check if this port is already assigned to a different sandbox
-        if let Some(existing_sandbox) = self.port_to_sandbox.get(&port) {
-            if existing_sandbox != &sandbox_key {
-                // Port is already assigned to a different sandbox - remove that mapping
-                warn!(
-                    "Port {} was already assigned to sandbox {}, reassigning to {}",
-                    port, existing_sandbox, sandbox_key
-                );
-                self.sandbox_to_port.remove(existing_sandbox);
-            }
+        if let Some(existing_sandbox) = self.port_to_sandbox.get(&port)
+            && existing_sandbox != &sandbox_key
+        {
+            // Port is already assigned to a different sandbox - remove that mapping
+            warn!(
+                "Port {} was already assigned to sandbox {}, reassigning to {}",
+                port, existing_sandbox, sandbox_key
+            );
+            self.sandbox_to_port.remove(existing_sandbox);
         }
 
         // Check if this sandbox already has a different port
-        if let Some(existing_port) = self.sandbox_to_port.get(&sandbox_key) {
-            if *existing_port != port {
-                // Sandbox had a different port - remove that mapping
-                self.port_to_sandbox.remove(existing_port);
-            }
+        if let Some(existing_port) = self.sandbox_to_port.get(&sandbox_key)
+            && *existing_port != port
+        {
+            // Sandbox had a different port - remove that mapping
+            self.port_to_sandbox.remove(existing_port);
         }
 
         // Insert the new mapping in both directions
@@ -202,15 +202,15 @@ impl PortManager {
         })?;
 
         // Create parent directory if it doesn't exist
-        if let Some(parent) = self.file_path.parent() {
-            if !parent.exists() {
-                fs::create_dir_all(parent).await.map_err(|e| {
-                    MicrosandboxServerError::ConfigError(format!(
-                        "Failed to create directory for port mappings file: {}",
-                        e
-                    ))
-                })?;
-            }
+        if let Some(parent) = self.file_path.parent()
+            && !parent.exists()
+        {
+            fs::create_dir_all(parent).await.map_err(|e| {
+                MicrosandboxServerError::ConfigError(format!(
+                    "Failed to create directory for port mappings file: {}",
+                    e
+                ))
+            })?;
         }
 
         fs::write(&self.file_path, contents).await.map_err(|e| {
@@ -269,10 +269,7 @@ impl PortManager {
     /// Verify that a port is still available (not bound by something else)
     fn verify_port_availability(&self, port: u16) -> bool {
         let addr = SocketAddr::new(LOCALHOST_IP, port);
-        match TcpListener::bind(addr) {
-            Ok(_) => true,   // We could bind, so it's available
-            Err(_) => false, // We couldn't bind, so it's not available
-        }
+        TcpListener::bind(addr).is_ok()
     }
 
     /// Get an available port from the OS
