@@ -1,4 +1,4 @@
 {
-  "microsandbox-core": "0.2.1",
-  "microsandbox-utils": "0.2.1"
+  ".": "0.2.6",
+  "sdk/rust": "0.1.2"
 }

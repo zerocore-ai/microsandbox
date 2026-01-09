@@ -1,75 +1,128 @@
-# name: 🚀 Release Packages & Binaries
+name: 🚀 Release Packages & Binaries
 
-# on:
-#   push:
-#     branches: [ main ]
-#   workflow_dispatch:
-#     inputs:
-#       run_publish_release:
-#         description: 'Publish release'
-#         type: boolean
-#         required: true
-#         default: false
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      trigger_release:
+        description: 'Trigger release'
+        type: boolean
+        required: true
+        default: false
 
-# permissions:
-#   contents: write
-#   pull-requests: write
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
 
-# jobs:
-#   release-please:
-#     runs-on: ubuntu-latest
-#     outputs:
-#       releases_created: ${{ steps.release.outputs.releases_created }}
-#       prs_created: ${{ steps.release.outputs.prs_created }}
-#       tag_name: ${{ steps.release.outputs.tag_name }}
-#     steps:
-#       - name: Setup release-please
-#         uses: googleapis/release-please-action@v4
-#         id: release
-#         with:
-#           token: ${{ secrets.GITHUB_TOKEN }}
-#           config-file: release-please-config.json
-#           manifest-file: .release-please-manifest.json
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.trigger_release == 'true' }}
+    outputs:
+      releases_created: ${{ steps.release.outputs.releases_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - name: Setup release-please
+        uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
 
-#       - name: Check release status
-#         run: |
-#           echo "Release created: ${{ steps.release.outputs.releases_created }}"
-#           echo "PRs created: ${{ steps.release.outputs.prs_created }}"
-#           echo "microsandbox created: ${{ steps.release.outputs.microsandbox--releases_created }}"
-#           echo "monofs created: ${{ steps.release.outputs.monofs--releases_created }}"
-#           echo "monoutils-store created: ${{ steps.release.outputs.monoutils-store--releases_created }}"
+      - name: Check release status
+        run: |
+          echo "Release created: ${{ steps.release.outputs.releases_created }}"
+          echo "Tag name: ${{ steps.release.outputs.tag_name }}"
 
-#   publish-release:
-#     needs:
-#       - release-please
-#     if: ${{ needs.release-please.outputs.releases_created == 'true' || github.event.inputs.run_publish_release }}
-#     runs-on: ubuntu-latest
-#     steps:
-#       - name: Checkout code
-#         uses: actions/checkout@v4
+  publish-sdk:
+    needs: release-please
+    if: ${{ needs.release-please.outputs['sdk/rust--release_created'] == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-#       - name: Publish monoutils-store
-#         working-directory: monoutils-store
-#         env:
-#           CARGO_TOKEN: ${{ secrets.CARGO_TOKEN }}
-#         run: |
-#           cargo publish -p monoutils-store
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
 
-#       - name: Wait for crates.io index update
-#         run: |
-#           echo "Waiting for crates.io to update index..."
-#           sleep 30
+      - name: Publish SDK crate
+        working-directory: sdk/rust
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_TOKEN }}
+        run: |
+          echo "Publishing microsandbox SDK..."
+          if cargo publish 2>&1 | tee publish.log; then
+            echo "✓ Successfully published microsandbox SDK"
+          elif grep -q "already uploaded" publish.log; then
+            echo "⚠ microsandbox SDK already published, skipping..."
+          else
+            echo "✗ Failed to publish microsandbox SDK"
+            cat publish.log
+            exit 1
+          fi
 
-#       - name: Publish monofs
-#         working-directory: monofs
-#         env:
-#           CARGO_TOKEN: ${{ secrets.CARGO_TOKEN }}
-#         run: |
-#           cargo publish -p monofs
+  build-and-package:
+    needs: release-please
+    if: ${{ needs.release-please.outputs['--release_created'] == 'true' }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+          - os: macos-14
+            target: aarch64-apple-darwin
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-#       - name: Publish microsandbox
-#         working-directory: microsandbox
-#         env:
-#           CARGO_TOKEN: ${{ secrets.CARGO_TOKEN }}
-#         run: |
-#           cargo publish -p microsandbox
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          target: ${{ matrix.target }}
+          override: true
+
+      - name: Install cross-compilation tools (Linux)
+        if: matrix.os == 'ubuntu-latest' && matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          if [ -n "${{ needs.release-please.outputs.tag_name }}" ]; then
+            VERSION=${{ needs.release-please.outputs.tag_name }}
+          else
+            VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          fi
+          echo "version=${VERSION#v}" >> $GITHUB_OUTPUT
+          echo "Version: ${VERSION#v}"
+
+      - name: Build and package
+        run: |
+          ./scripts/package_microsandbox.sh ${{ steps.version.outputs.version }}
+        env:
+          CARGO_BUILD_TARGET: ${{ matrix.target }}
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v1
+        if: needs.release-please.outputs.tag_name != ''
+        with:
+          tag_name: ${{ needs.release-please.outputs.tag_name }}
+          files: |
+            build/microsandbox-*.tar.gz
+            build/microsandbox-*.tar.gz.sha256
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

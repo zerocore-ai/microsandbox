@@ -1,26 +1,26 @@
 {
   "bump-minor-pre-major": true,
   "bump-patch-for-minor-pre-major": true,
+  "draft": true,
   "packages": {
-    "microsandbox-core": {
-      "package-name": "microsandbox-core",
-      "release-type": "rust"
+    ".": {
+      "package-name": "microsandbox",
+      "release-type": "rust",
+      "component": "microsandbox",
+      "exclude-paths": [
+        "sdk"
+      ]
     },
-    "microsandbox-utils": {
-      "package-name": "microsandbox-utils",
-      "skip-github-release": true,
-      "release-type": "rust"
+    "sdk/rust": {
+      "package-name": "microsandbox-rust-sdk",
+      "release-type": "rust",
+      "component": "microsandbox-rust-sdk"
     }
   },
   "plugins": [
     {
       "type": "cargo-workspace",
-      "merge": false
-    },
-    {
-      "type": "linked-versions",
-      "groupName": "microsandbox-project",
-      "components": ["microsandbox-core", "microsandbox-utils"]
+      "merge": true
     }
   ]
 }
