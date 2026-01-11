@@ -238,7 +238,7 @@ async fn unpack<R: AsyncRead + Unpin>(
     // directory component i.e. "."
     let parent = entry_path.parent().expect("tar entry to have a parent");
     let ancestors = parent.ancestors().collect::<Vec<_>>();
-    for (_, ancestor) in ancestors.into_iter().rev().skip(1).enumerate() {
+    for ancestor in ancestors.into_iter().rev().skip(1) {
         // To avoid directory traversal attacks, skip relative parent directories entries
         let dir_name = ancestor.components().next();
         if dir_name == Some(Component::ParentDir) {
@@ -297,12 +297,12 @@ async fn create_and_copy_dir_attr(template_dir: &Path, dest_dir: &Path) -> Micro
     // Create new directory, and copy over permissions and xattrs from template directory
     let mode = fs::metadata(&template_dir).await?.permissions().mode();
     DirBuilder::new().mode(mode).create(&dest_dir).await?;
-    if let Ok(xattrs) = xattr::list(&template_dir) {
+    if let Ok(xattrs) = xattr::list(template_dir) {
         for attr in xattrs {
-            if let Ok(Some(value)) = xattr::get(&template_dir, &attr) {
-                if let Err(e) = xattr::set(&dest_dir, &attr, &value) {
-                    tracing::warn!("Failed to set xattr: {}", e);
-                }
+            if let Ok(Some(value)) = xattr::get(template_dir, &attr)
+                && let Err(e) = xattr::set(dest_dir, &attr, &value)
+            {
+                tracing::warn!("Failed to set xattr: {}", e);
             }
         }
     }
@@ -377,7 +377,7 @@ impl HardLinkVec {
                     // Store original uid/gid/mode in xattrs
                     if let Err(e) = set_stat_xattr(
                         &link_info.link_path,
-                        &xattr_name,
+                        xattr_name,
                         link_info.uid,
                         link_info.gid,
                         link_info.mode,

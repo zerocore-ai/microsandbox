@@ -879,7 +879,7 @@ pub(crate) async fn create_or_update_manifest_layer(
     let db_layer_id = match db_layer_id {
         Some(layer_id) => layer_id,
         None => {
-            save_or_update_layer(pool, &layer.media_type, &layer.digest, layer.size, &diff_id)
+            save_or_update_layer(pool, &layer.media_type, &layer.digest, layer.size, diff_id)
                 .await?
         }
     };

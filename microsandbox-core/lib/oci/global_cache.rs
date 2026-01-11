@@ -46,10 +46,10 @@ pub trait GlobalCacheOps: Send + Sync {
 
         // if there's at least one file in that specific layer directory, it means the layer already exists
         let parent = tar_path.parent().expect("tar path to have parent");
-        if let Ok(mut read_dir) = tokio::fs::read_dir(parent).await {
-            if let Ok(Some(_)) = read_dir.next_entry().await {
-                return Some(layer);
-            }
+        if let Ok(mut read_dir) = tokio::fs::read_dir(parent).await
+            && let Ok(Some(_)) = read_dir.next_entry().await
+        {
+            return Some(layer);
         }
 
         tracing::warn!(?digest, "layer exists but is empty");

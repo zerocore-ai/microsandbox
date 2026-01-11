@@ -177,7 +177,7 @@ where
 
         let mut file = file.open(&download_path).await?;
         let mut stream = self
-            .fetch_digest_blob(&reference, digest, existing_size, None)
+            .fetch_digest_blob(reference, digest, existing_size, None)
             .await?;
 
         // Write the stream to the file
@@ -254,7 +254,7 @@ where
     /// The image can be selected either by tag or digest using the [`ReferenceSelector`] enum.
     pub(crate) async fn pull_image(&self, reference: &Reference) -> MicrosandboxResult<()> {
         // Check if all layers are extracted before proceeding to fetch and extract
-        if self.global_cache().all_layers_extracted(&reference).await? {
+        if self.global_cache().all_layers_extracted(reference).await? {
             tracing::info!(?reference, "Image was already extracted");
             return Ok(());
         }

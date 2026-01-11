@@ -125,8 +125,8 @@ impl Image {
     /// ## Arguments
     ///
     /// * `image` - The reference to the image to pull
-    /// * `layer_extraction_dir` - The path to store the layer files. If None,
-    ///                            the default layer output directory is used.
+    /// * `layer_extraction_dir` - The path to store the layer files.
+    ///   If None, the default layer output directory is used.
     ///
     pub async fn pull(
         image: Reference,

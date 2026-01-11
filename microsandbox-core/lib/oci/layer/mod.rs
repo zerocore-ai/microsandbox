@@ -89,7 +89,7 @@ pub(crate) trait LayerOps: Send + Sync {
     ///
     /// If the directory is found, the canonical path to the directory in the extracted
     /// layer directory is returned. Otherwise, returns None.
-    async fn find_dir(&self, path_in_tar: &PathBuf) -> Option<PathBuf>;
+    async fn find_dir(&self, path_in_tar: &Path) -> Option<PathBuf>;
 }
 
 #[derive(Clone)]
@@ -199,7 +199,7 @@ impl LayerOps for Layer {
         Ok(())
     }
 
-    async fn find_dir(&self, path: &PathBuf) -> Option<PathBuf> {
+    async fn find_dir(&self, path: &Path) -> Option<PathBuf> {
         let canonical_path = self.extracted_layer_dir().join(path);
         if canonical_path.exists() && canonical_path.is_dir() {
             return Some(canonical_path);
