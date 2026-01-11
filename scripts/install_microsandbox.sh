@@ -151,24 +151,26 @@ download_files() {
 
     # Download archive with progress bar
     info "Downloading from: ${BASE_URL}/${ARCHIVE_NAME}"
-    if ! curl -L -f -# -o "${ARCHIVE_NAME}" "${BASE_URL}/${ARCHIVE_NAME}" 2>/tmp/curl_error.log; then
-        if grep -q "404" /tmp/curl_error.log 2>/dev/null; then
+    HTTP_CODE=$(curl -L -f -# -o "${ARCHIVE_NAME}" -w "%{http_code}" "${BASE_URL}/${ARCHIVE_NAME}")
+    if [ $? -ne 0 ]; then
+        if [ "$HTTP_CODE" = "404" ]; then
             error "Archive not found: ${ARCHIVE_NAME}"
             error "This platform (${PLATFORM}) may not be supported for version ${VERSION}"
             error "Available releases: https://github.com/${GITHUB_REPO}/releases"
         else
-            error "Failed to download archive: $(cat /tmp/curl_error.log 2>/dev/null || echo 'Unknown error')"
+            error "Failed to download archive (HTTP $HTTP_CODE)"
         fi
         exit 1
     fi
 
     # Download checksum silently
-    if ! curl -L -f -s -o "${CHECKSUM_FILE}" "${BASE_URL}/${CHECKSUM_FILE}" 2>/tmp/curl_error.log; then
-        if grep -q "404" /tmp/curl_error.log 2>/dev/null; then
+    HTTP_CODE=$(curl -L -f -s -o "${CHECKSUM_FILE}" -w "%{http_code}" "${BASE_URL}/${CHECKSUM_FILE}")
+    if [ $? -ne 0 ]; then
+        if [ "$HTTP_CODE" = "404" ]; then
             error "Checksum file not found: ${CHECKSUM_FILE}"
             error "The release may be incomplete or this platform is not supported"
         else
-            error "Failed to download checksum: $(cat /tmp/curl_error.log 2>/dev/null || echo 'Unknown error')"
+            error "Failed to download checksum (HTTP $HTTP_CODE)"
         fi
         exit 1
     fi
