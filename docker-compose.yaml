@@ -1,0 +1,49 @@
+services:
+  microsandbox:
+    image: alexsuntop/microsandbox:${MICROSANDBOX_VERSION:-0.2.6}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - DEBIAN_VERSION=${DEBIAN_VERSION:-13.2-slim}
+        - MICROSANDBOX_VERSION=${MICROSANDBOX_VERSION:-0.2.6}
+        - MICROSANDBOX_AUTO_PULL_IMAGES=${MICROSANDBOX_AUTO_PULL_IMAGES:-true}
+    restart: unless-stopped
+    ports:
+      - ${MICROSANDBOX_PORT_OVERRIDE:-5555}:${MICROSANDBOX_PORT:-5555}
+    privileged: true
+    security_opt:
+      - apparmor=unconfined
+      - seccomp=unconfined
+    environment:
+      - TZ=${TZ:-UTC}
+      - MICROSANDBOX_HOME=/root/.microsandbox
+    volumes:
+      - microsandbox_config:/root/.microsandbox/namespaces
+      - microsandbox_workspace:/workspace
+    devices:
+      - /dev/kvm:/dev/kvm
+      - /dev/net/tun:/dev/net/tun
+    command:
+      [
+        "server",
+        "start",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "${MICROSANDBOX_PORT:-5555}",
+        "--dev",
+      ]
+    working_dir: /workspace
+    deploy:
+      resources:
+        limits:
+          cpus: ${MICROSANDBOX_CPU_LIMIT:-4.00}
+          memory: ${MICROSANDBOX_MEMORY_LIMIT:-8G}
+        reservations:
+          cpus: ${MICROSANDBOX_CPU_RESERVATION:-1.00}
+          memory: ${MICROSANDBOX_MEMORY_RESERVATION:-2G}
+
+volumes:
+  microsandbox_config:
+  microsandbox_workspace:
