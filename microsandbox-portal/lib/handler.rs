@@ -21,6 +21,18 @@ use crate::portal::repl::{Language, start_engines};
 // Functions
 //--------------------------------------------------------------------------------------------------
 
+/// Health check endpoint to verify portal readiness
+pub async fn health_check_handler(
+    State(state): State<SharedState>,
+) -> Result<impl IntoResponse, PortalError> {
+    let ready = *state.ready.lock().await;
+    if ready {
+        Ok((StatusCode::OK, "OK"))
+    } else {
+        Ok((StatusCode::SERVICE_UNAVAILABLE, "Not ready"))
+    }
+}
+
 /// Handles JSON-RPC requests
 pub async fn json_rpc_handler(
     State(state): State<SharedState>,
