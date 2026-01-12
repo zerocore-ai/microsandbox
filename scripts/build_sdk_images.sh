@@ -88,12 +88,12 @@ function build_sdk_image {
     info "Image name: ${image_name}"
 
     # Build the image
-    docker build -t "$image_name" -f "$dockerfile" "$PROJECT_ROOT"
+    nerdctl build -t "$image_name" -f "$dockerfile" "$PROJECT_ROOT"
 
     # Check if build was successful
     if [ $? -eq 0 ]; then
         info "Successfully built ${image_name} image!"
-        info "You can run it with: docker run -it -p 4444:4444 -e RUST_LOG=info --name ${image_name} ${image_name}"
+        info "You can run it with: nerdctl run -it -p 4444:4444 -e RUST_LOG=info --name ${image_name} ${image_name}"
     else
         error "Failed to build ${image_name} image!"
         return 1
@@ -176,5 +176,5 @@ for sdk in "${SDKS_TO_BUILD[@]}"; do
     printf "  - ${YELLOW}%s${NC}\n" "${sdk}"
 done
 printf "\n${GREEN}You can run these images with:${NC}\n"
-echo "  docker run -it -p 4444:4444 -e RUST_LOG=info --name IMAGE_NAME IMAGE_NAME"
+echo "  nerdctl run -it -p 4444:4444 -e RUST_LOG=info --name IMAGE_NAME IMAGE_NAME"
 printf "${BLUE}================================================================${NC}\n\n"
