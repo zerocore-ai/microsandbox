@@ -58,6 +58,9 @@ pub mod python;
 #[cfg(feature = "nodejs")]
 pub mod nodejs;
 
+#[cfg(feature = "bun")]
+pub mod bun;
+
 pub mod engine;
 pub mod types;
 

@@ -36,6 +36,7 @@ uuid.workspace = true
 default = []
 nodejs = []
 python = []
+bun = []
 
 [dev-dependencies]
 reqwest = { workspace = true, features = ["json"] }

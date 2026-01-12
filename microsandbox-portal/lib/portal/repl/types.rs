@@ -35,7 +35,7 @@ use tokio::sync::mpsc::Sender;
 //--------------------------------------------------------------------------------------------------
 
 /// Supported programming languages for evaluation
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Language {
     /// Python language support
     #[cfg(feature = "python")]
@@ -44,6 +44,10 @@ pub enum Language {
     /// Node.js/JavaScript support
     #[cfg(feature = "nodejs")]
     Node,
+
+    /// Bun/JavaScript support
+    #[cfg(feature = "bun")]
+    Bun,
 }
 
 /// Stream type for output lines
