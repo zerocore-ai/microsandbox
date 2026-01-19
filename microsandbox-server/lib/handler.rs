@@ -475,6 +475,7 @@ pub async fn sandbox_start_impl(
         *sandboxes_value = serde_yaml::Value::Mapping(serde_yaml::Mapping::new());
     }
 
+
     let sandboxes_map = sandboxes_value.as_mapping_mut().unwrap();
 
     // If config is provided and we have an image, update the sandbox configuration

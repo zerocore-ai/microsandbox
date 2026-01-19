@@ -56,6 +56,12 @@ pub struct Config {
 
     /// Address to listen on
     addr: SocketAddr,
+
+    /// Minimum port for sandbox port range (if set)
+    port_range_min: Option<u16>,
+
+    /// Maximum port for sandbox port range (if set)
+    port_range_max: Option<u16>,
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -91,6 +97,13 @@ impl Config {
         let namespace_dir = namespace_dir
             .unwrap_or_else(|| env::get_microsandbox_home_path().join(NAMESPACES_SUBDIR));
 
+        // Load sandbox port range from environment variables
+        let port_range = env::get_sandbox_port_range();
+        let (port_range_min, port_range_max) = match port_range {
+            Some((min, max)) => (Some(min), Some(max)),
+            None => (None, None),
+        };
+
         Ok(Self {
             key,
             namespace_dir,
@@ -98,6 +111,8 @@ impl Config {
             host: host_ip,
             port,
             addr,
+            port_range_min,
+            port_range_max,
         })
     }
 }

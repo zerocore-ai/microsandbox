@@ -161,7 +161,7 @@ uninstall:
 	fi
 
 build_libkrun:
-	./scripts/build_libkrun.sh --no-clean --build-dir "$(BUILD_DIR)"
+	bash ./scripts/build_libkrun.sh --no-clean --build-dir "$(BUILD_DIR)"
 
 # Catch-all target to allow example names and arguments
 %:

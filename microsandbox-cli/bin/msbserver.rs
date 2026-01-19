@@ -41,11 +41,21 @@ pub async fn main() -> MicrosandboxCliResult<()> {
         args.dev_mode,
     )?);
 
-    // Get namespace directory from config
+    // Get namespace directory and port range from config
     let namespace_dir = config.get_namespace_dir().clone();
+    let port_range = (
+        config.get_port_range_min().as_ref().copied(),
+        config.get_port_range_max().as_ref().copied(),
+    );
 
-    // Initialize the port manager
-    let port_manager = PortManager::new(namespace_dir).await.map_err(|e| {
+    // Initialize the port manager with the configured port range
+    let port_manager = if let (Some(min), Some(max)) = port_range {
+        PortManager::new_with_range(namespace_dir, Some((min, max)))
+            .await
+    } else {
+        PortManager::new(namespace_dir).await
+    }
+    .map_err(|e| {
         eprintln!("Error initializing port manager: {}", e);
         e
     })?;
