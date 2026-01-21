@@ -11,4 +11,5 @@ export { Execution } from "./execution";
 export { Metrics } from "./metrics";
 export { NodeSandbox } from "./node-sandbox";
 export { PythonSandbox } from "./python-sandbox";
+export { BunSandbox } from "./bun-sandbox";
 export { SandboxOptions } from "./types";
