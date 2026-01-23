@@ -58,7 +58,7 @@ pub struct SandboxBuilder<I> {
     meta: Option<Meta>,
     image: I,
     memory: Option<u32>,
-    cpus: Option<u8>,
+    cpus: Option<f32>,
     volumes: Vec<PathPair>,
     ports: Vec<PortPair>,
     envs: Vec<EnvPair>,
@@ -163,7 +163,7 @@ impl<I> SandboxBuilder<I> {
     }
 
     /// Sets the maximum number of CPUs allowed for the sandbox
-    pub fn cpus(mut self, cpus: u8) -> SandboxBuilder<I> {
+    pub fn cpus(mut self, cpus: f32) -> SandboxBuilder<I> {
         self.cpus = Some(cpus);
         self
     }

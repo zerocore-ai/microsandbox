@@ -473,7 +473,7 @@ pub async fn run_temp(
         let mut b = Sandbox::builder().image(ReferenceOrPath::Reference(image.clone()));
 
         if let Some(cpus) = cpus {
-            b = b.cpus(cpus);
+            b = b.cpus(cpus as f32);
         }
 
         if let Some(memory) = memory {

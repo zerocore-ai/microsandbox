@@ -24,8 +24,8 @@ use crate::MICROSANDBOX_HOME_DIR;
 /// The default maximum log file size (10MB)
 pub const DEFAULT_LOG_MAX_SIZE: u64 = 10 * 1024 * 1024;
 
-/// The default number of vCPUs to use for the MicroVm.
-pub const DEFAULT_NUM_VCPUS: u8 = 1;
+/// The default number of vCPUs to use for the MicroVm (supports fractional values).
+pub const DEFAULT_NUM_VCPUS: f32 = 1.0;
 
 /// The default amount of memory in MiB to use for the MicroVm.
 pub const DEFAULT_MEMORY_MIB: u32 = 1024;
@@ -77,3 +77,68 @@ pub const DEFAULT_SERVER_PORT: u16 = 5555;
 
 /// The default microsandbox-portal port.
 pub const DEFAULT_PORTAL_GUEST_PORT: u16 = 4444;
+
+//--------------------------------------------------------------------------------------------------
+// Tests
+//--------------------------------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_num_vcpus_is_fractional_one() {
+        assert_eq!(DEFAULT_NUM_VCPUS, 1.0f32);
+    }
+
+    #[test]
+    fn default_memory_mib_is_1024() {
+        assert_eq!(DEFAULT_MEMORY_MIB, 1024u32);
+    }
+
+    #[test]
+    fn default_microsandbox_home_points_to_user_home_dir() {
+        let home = dirs::home_dir().unwrap().join(MICROSANDBOX_HOME_DIR);
+        assert_eq!(*DEFAULT_MICROSANDBOX_HOME, home);
+    }
+
+    #[test]
+    fn default_config_has_sandboxes_section() {
+        assert!(DEFAULT_CONFIG.contains("sandboxes:"));
+    }
+
+    #[test]
+    fn default_shell_is_bin_sh() {
+        assert_eq!(DEFAULT_SHELL, "/bin/sh");
+    }
+
+    #[test]
+    fn default_server_namespace_is_default() {
+        assert_eq!(DEFAULT_SERVER_NAMESPACE, "default");
+    }
+
+    #[test]
+    fn default_server_host_and_port_match_expected() {
+        assert_eq!(DEFAULT_SERVER_HOST, "127.0.0.1");
+        assert_eq!(DEFAULT_SERVER_PORT, 5555u16);
+    }
+
+    #[test]
+    fn default_portal_guest_port_is_4444() {
+        assert_eq!(DEFAULT_PORTAL_GUEST_PORT, 4444u16);
+    }
+
+    #[test]
+    fn default_msbrun_and_msbserver_paths_end_with_expected_binaries() {
+        let msbrun = DEFAULT_MSBRUN_EXE_PATH
+            .file_name()
+            .unwrap()
+            .to_string_lossy();
+        let msbserver = DEFAULT_MSBSERVER_EXE_PATH
+            .file_name()
+            .unwrap()
+            .to_string_lossy();
+        assert_eq!(msbrun, "msbrun");
+        assert_eq!(msbserver, "msbserver");
+    }
+}

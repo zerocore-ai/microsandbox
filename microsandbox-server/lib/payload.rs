@@ -151,7 +151,7 @@ pub struct SandboxMetricsGetParams {
 
 /// Configuration for a sandbox
 /// Similar to microsandbox-core's Sandbox but with optional fields for update operations
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct SandboxConfig {
     /// The image to use (optional for updates)
     pub image: Option<String>,
@@ -159,8 +159,8 @@ pub struct SandboxConfig {
     /// The amount of memory in MiB to use
     pub memory: Option<u32>,
 
-    /// The number of vCPUs to use
-    pub cpus: Option<u8>,
+    /// The number of vCPUs to use (supports fractional values like 0.5, 0.25)
+    pub cpus: Option<f32>,
 
     /// The volumes to mount
     #[serde(default)]
@@ -385,5 +385,75 @@ impl axum::response::IntoResponse for JsonRpcResponseOrNotification {
                 axum::http::StatusCode::OK.into_response()
             }
         }
+    }
+}
+
+//--------------------------------------------------------------------------------------------------
+// Tests
+//--------------------------------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn deserializes_sandbox_config_with_fractional_cpus() {
+        let json = r#"{
+            "image": "python:3.11-slim",
+            "memory": 512,
+            "cpus": 0.5,
+            "volumes": [],
+            "ports": [],
+            "envs": [],
+            "depends_on": []
+        }"#;
+
+        let cfg: SandboxConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(cfg.cpus, Some(0.5));
+        assert_eq!(cfg.memory, Some(512));
+        assert_eq!(cfg.image.as_deref(), Some("python:3.11-slim"));
+    }
+
+    #[test]
+    fn deserializes_sandbox_config_without_cpus_sets_none() {
+        let json = r#"{
+            "image": "alpine:latest",
+            "memory": 256
+        }"#;
+
+        let cfg: SandboxConfig = serde_json::from_str(json).unwrap();
+        assert!(cfg.cpus.is_none());
+    }
+
+    #[test]
+    fn deserializes_sandbox_config_with_null_cpus_sets_none() {
+        let json = r#"{
+            "image": "alpine:latest",
+            "memory": 256,
+            "cpus": null
+        }"#;
+
+        let cfg: SandboxConfig = serde_json::from_str(json).unwrap();
+        assert!(cfg.cpus.is_none());
+    }
+
+    #[test]
+    fn serializes_sandbox_config_with_fractional_cpus() {
+        let cfg = SandboxConfig {
+            image: Some("node:20".to_string()),
+            memory: Some(1024),
+            cpus: Some(0.25),
+            volumes: vec![],
+            ports: vec![],
+            envs: vec![],
+            depends_on: vec![],
+            workdir: None,
+            shell: None,
+            scripts: Default::default(),
+            exec: None,
+        };
+
+        let value = serde_json::to_value(&cfg).unwrap();
+        assert_eq!(value.get("cpus").and_then(|v| v.as_f64()), Some(0.25));
     }
 }

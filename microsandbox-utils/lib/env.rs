@@ -20,6 +20,12 @@ pub const MSBRUN_EXE_ENV_VAR: &str = "MSBRUN_EXE";
 /// Environment variable for the msbserver binary path
 pub const MSBSERVER_EXE_ENV_VAR: &str = "MSBSERVER_EXE";
 
+/// Environment variable for the minimum port in the sandbox port range
+pub const MICROSANDBOX_PORT_MIN_ENV_VAR: &str = "MICROSANDBOX_PORT_MIN";
+
+/// Environment variable for the maximum port in the sandbox port range
+pub const MICROSANDBOX_PORT_MAX_ENV_VAR: &str = "MICROSANDBOX_PORT_MAX";
+
 //--------------------------------------------------------------------------------------------------
 // Functions
 //--------------------------------------------------------------------------------------------------
@@ -43,5 +49,22 @@ pub fn get_oci_registry() -> String {
         oci_registry_domain
     } else {
         DEFAULT_OCI_REGISTRY.to_string()
+    }
+}
+
+/// Returns the port range for sandbox port allocation.
+/// If both MICROSANDBOX_PORT_MIN and MICROSANDBOX_PORT_MAX are set,
+/// returns Some((min, max)). Otherwise, returns None for dynamic allocation.
+pub fn get_sandbox_port_range() -> Option<(u16, u16)> {
+    let min = std::env::var(MICROSANDBOX_PORT_MIN_ENV_VAR)
+        .ok()
+        .and_then(|v| v.parse::<u16>().ok());
+    let max = std::env::var(MICROSANDBOX_PORT_MAX_ENV_VAR)
+        .ok()
+        .and_then(|v| v.parse::<u16>().ok());
+
+    match (min, max) {
+        (Some(min_val), Some(max_val)) if min_val <= max_val => Some((min_val, max_val)),
+        _ => None,
     }
 }
