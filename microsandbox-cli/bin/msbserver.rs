@@ -50,8 +50,7 @@ pub async fn main() -> MicrosandboxCliResult<()> {
 
     // Initialize the port manager with the configured port range
     let port_manager = if let (Some(min), Some(max)) = port_range {
-        PortManager::new_with_range(namespace_dir, Some((min, max)))
-            .await
+        PortManager::new_with_range(namespace_dir, Some((min, max))).await
     } else {
         PortManager::new(namespace_dir).await
     }

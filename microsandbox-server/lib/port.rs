@@ -173,10 +173,7 @@ impl PortManager {
         let mappings = Self::load_mappings(&file_path).await?;
 
         if let Some((min, max)) = port_range {
-            info!(
-                "Port manager initialized with port range: {}-{}",
-                min, max
-            );
+            info!("Port manager initialized with port range: {}-{}", min, max);
         } else {
             debug!("Port manager initialized with dynamic port allocation");
         }
@@ -297,7 +294,10 @@ impl PortManager {
     fn get_available_port(&self) -> MicrosandboxServerResult<u16> {
         // If a port range is configured, try to find an available port within it
         if let Some((min, max)) = self.port_range {
-            debug!("Attempting to find an available port in range {}-{}", min, max);
+            debug!(
+                "Attempting to find an available port in range {}-{}",
+                min, max
+            );
 
             for port in min..=max {
                 if self.verify_port_availability(port) {

@@ -130,10 +130,11 @@ pub struct Build {
     #[builder(default, setter(strip_option))]
     pub(crate) memory: Option<u32>,
 
-    /// The number of vCPUs to use.
+    /// The number of vCPUs to use (supports fractional values like 0.5, 0.25).
+    /// Valid range: 0.1 to 128.0
     #[serde(skip_serializing_if = "Option::is_none", default)]
     #[builder(default, setter(strip_option))]
-    pub(crate) cpus: Option<u8>,
+    pub(crate) cpus: Option<f32>,
 
     /// The volumes to mount.
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
@@ -242,9 +243,10 @@ pub struct Sandbox {
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub(crate) memory: Option<u32>,
 
-    /// The number of vCPUs to use.
+    /// The number of vCPUs to use (supports fractional values like 0.5, 0.25).
+    /// Valid range: 0.1 to 128.0
     #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub(crate) cpus: Option<u8>,
+    pub(crate) cpus: Option<f32>,
 
     /// The volumes to mount.
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
@@ -633,7 +635,7 @@ mod tests {
         let sandbox = sandboxes.get("test_sandbox").unwrap();
         assert_eq!(sandbox.version.as_ref().unwrap().to_string(), "1.0.0");
         assert_eq!(sandbox.memory.unwrap(), 1024);
-        assert_eq!(sandbox.cpus.unwrap(), 2);
+        assert_eq!(sandbox.cpus.unwrap(), 2.0);
         assert_eq!(sandbox.volumes[0].to_string(), "./src:/app/src");
         assert_eq!(sandbox.ports[0].to_string(), "8080:80");
         assert_eq!(sandbox.envs[0].to_string(), "DEBUG=true");
@@ -718,7 +720,7 @@ mod tests {
         let builds = &config.builds;
         let base_build = builds.get("base_build").unwrap();
         assert_eq!(base_build.memory.unwrap(), 2048);
-        assert_eq!(base_build.cpus.unwrap(), 2);
+        assert_eq!(base_build.cpus.unwrap(), 2.0);
         assert_eq!(
             base_build.workdir.as_ref().unwrap(),
             &Utf8UnixPathBuf::from("/build")
@@ -742,7 +744,7 @@ mod tests {
         let api = sandboxes.get("api").unwrap();
         assert_eq!(api.version.as_ref().unwrap().to_string(), "1.0.0");
         assert_eq!(api.memory.unwrap(), 1024);
-        assert_eq!(api.cpus.unwrap(), 1);
+        assert_eq!(api.cpus.unwrap(), 1.0);
         assert_eq!(api.depends_on, vec!["database", "cache"]);
         assert_eq!(api.scope, NetworkScope::Public);
     }
@@ -794,5 +796,51 @@ mod tests {
                 version: "invalid"
         "#;
         assert!(serde_yaml::from_str::<Microsandbox>(yaml).is_err());
+    }
+
+    #[test]
+    fn microsandbox_config_accepts_fractional_cpus_in_sandbox_and_build() {
+        let yaml = r#"
+            builds:
+              base:
+                image: "alpine:latest"
+                cpus: 0.5
+            sandboxes:
+              svc:
+                image: "alpine:latest"
+                shell: "/bin/sh"
+                cpus: 0.25
+        "#;
+
+        let config: Microsandbox = serde_yaml::from_str(yaml).unwrap();
+        let base = config.get_build("base").unwrap();
+        assert_eq!(base.cpus, Some(0.5));
+        let svc = config.get_sandbox("svc").unwrap();
+        assert_eq!(svc.cpus, Some(0.25));
+    }
+
+    #[test]
+    fn microsandbox_config_missing_cpus_is_none() {
+        let yaml = r#"
+            sandboxes:
+              a:
+                image: "alpine:latest"
+                shell: "/bin/sh"
+        "#;
+        let config: Microsandbox = serde_yaml::from_str(yaml).unwrap();
+        assert!(config.get_sandbox("a").unwrap().cpus.is_none());
+    }
+
+    #[test]
+    fn microsandbox_config_integer_cpus_still_supported() {
+        let yaml = r#"
+            sandboxes:
+              b:
+                image: "alpine:latest"
+                shell: "/bin/sh"
+                cpus: 2
+        "#;
+        let config: Microsandbox = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(config.get_sandbox("b").unwrap().cpus, Some(2.0));
     }
 }
