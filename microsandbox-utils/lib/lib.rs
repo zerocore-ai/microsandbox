@@ -4,8 +4,10 @@
 #![allow(clippy::module_inception)]
 
 pub mod defaults;
+pub mod docker_config;
 pub mod env;
 pub mod error;
+pub mod registry_auth;
 pub mod log;
 pub mod path;
 pub mod runtime;
@@ -17,8 +19,10 @@ pub mod term;
 //--------------------------------------------------------------------------------------------------
 
 pub use defaults::*;
+pub use docker_config::*;
 pub use env::*;
 pub use error::*;
+pub use registry_auth::*;
 pub use log::*;
 pub use path::*;
 pub use runtime::*;
