@@ -194,6 +194,7 @@ where
 /// 3) Docker config (auths/cred helpers)
 /// 4) Anonymous
 pub fn resolve_registry_auth(reference: &Reference) -> MicrosandboxResult<RegistryAuth> {
+    // TODO: Ensure msb server inherits auth sources (env, stored creds, Docker config) in its runtime.
     let registry = reference.registry();
     if let Some(auth) = resolve_env_auth()? {
         return Ok(auth);
