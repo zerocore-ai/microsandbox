@@ -15,6 +15,11 @@ use indicatif::{ProgressBar, ProgressStyle};
 #[cfg(feature = "cli")]
 use microsandbox_utils::term::{self, MULTI_PROGRESS};
 use microsandbox_utils::{EXTRACTED_LAYER_SUFFIX, LAYERS_SUBDIR, OCI_DB_FILENAME, env};
+use microsandbox_utils::{
+    DockerAuthCredentials, StoredRegistryCredentials, load_docker_registry_credentials,
+    load_stored_registry_credentials,
+};
+use oci_client::secrets::RegistryAuth;
 use oci_spec::image::Platform;
 #[cfg(feature = "cli")]
 use pin_project_lite::pin_project;
@@ -93,7 +98,9 @@ pub async fn pull(image: Reference, layer_output_dir: Option<PathBuf>) -> Micros
     let microsandbox_home_path = env::get_microsandbox_home_path();
     let db_path = microsandbox_home_path.join(OCI_DB_FILENAME);
     let db = db::get_or_create_pool(&db_path, &db::OCI_DB_MIGRATOR).await?;
-    let registry = Registry::new(temp_download_dir, db.clone(), Platform::default(), layer).await?;
+    let auth = resolve_registry_auth(&image)?;
+    let registry =
+        Registry::new(temp_download_dir, db.clone(), Platform::default(), layer, auth).await?;
 
     // Use custom layer_output_dir if specified, otherwise use default microsandbox layers directory
     let layers_dir = layer_output_dir.unwrap_or_else(|| microsandbox_home_path.join(LAYERS_SUBDIR));
@@ -173,6 +180,203 @@ where
     extract_layers_sp.finish();
 
     Ok(())
+}
+
+//--------------------------------------------------------------------------------------------------
+// Functions: Auth resolution
+//--------------------------------------------------------------------------------------------------
+
+fn resolve_registry_auth(reference: &Reference) -> MicrosandboxResult<RegistryAuth> {
+    let registry = reference.registry();
+    if let Some(auth) = resolve_env_auth()? {
+        return Ok(auth);
+    }
+
+    match load_stored_registry_credentials(registry) {
+        Ok(Some(creds)) => return Ok(convert_stored_credentials(creds)),
+        Ok(None) => (),
+        Err(err) => {
+            tracing::warn!("failed to load stored registry auth: {}", err);
+        }
+    }
+
+    match load_docker_registry_credentials(registry) {
+        Ok(Some(creds)) => Ok(convert_docker_credentials(creds)),
+        Ok(None) => Ok(RegistryAuth::Anonymous),
+        Err(err) => {
+            tracing::warn!("failed to load docker config auth: {}", err);
+            Ok(RegistryAuth::Anonymous)
+        }
+    }
+}
+
+fn resolve_env_auth() -> MicrosandboxResult<Option<RegistryAuth>> {
+    let token = env::get_registry_token();
+    let username = env::get_registry_username();
+    let password = env::get_registry_password();
+
+    if token.is_none() && username.is_none() && password.is_none() {
+        return Ok(None);
+    }
+
+    if token.is_some() && (username.is_some() || password.is_some()) {
+        return Err(MicrosandboxError::ConfigValidation(
+            "registry token cannot be combined with username/password".to_string(),
+        ));
+    }
+
+    if let Some(token) = token {
+        return Ok(Some(RegistryAuth::Bearer(token)));
+    }
+
+    match (username, password) {
+        (Some(username), Some(password)) => Ok(Some(RegistryAuth::Basic(username, password))),
+        (None, None) => Ok(None),
+        _ => Err(MicrosandboxError::ConfigValidation(
+            "both registry username and password are required".to_string(),
+        )),
+    }
+}
+
+fn convert_docker_credentials(creds: DockerAuthCredentials) -> RegistryAuth {
+    match creds {
+        DockerAuthCredentials::Basic { username, password } => {
+            RegistryAuth::Basic(username, password)
+        }
+        DockerAuthCredentials::Token { token } => RegistryAuth::Bearer(token),
+    }
+}
+
+fn convert_stored_credentials(creds: StoredRegistryCredentials) -> RegistryAuth {
+    match creds {
+        StoredRegistryCredentials::Basic { username, password } => {
+            RegistryAuth::Basic(username, password)
+        }
+        StoredRegistryCredentials::Token { token } => RegistryAuth::Bearer(token),
+    }
+}
+
+//--------------------------------------------------------------------------------------------------
+// Tests
+//--------------------------------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::{env as std_env, fs};
+    use tempfile::TempDir;
+
+    struct EnvGuard {
+        key: &'static str,
+        prev: Option<std::ffi::OsString>,
+    }
+
+    impl EnvGuard {
+        fn set(key: &'static str, value: impl Into<std::ffi::OsString>) -> Self {
+            let prev = std_env::var_os(key);
+            std_env::set_var(key, value);
+            Self { key, prev }
+        }
+
+        fn remove(key: &'static str) -> Self {
+            let prev = std_env::var_os(key);
+            std_env::remove_var(key);
+            Self { key, prev }
+        }
+    }
+
+    impl Drop for EnvGuard {
+        fn drop(&mut self) {
+            if let Some(value) = self.prev.take() {
+                std_env::set_var(self.key, value);
+            } else {
+                std_env::remove_var(self.key);
+            }
+        }
+    }
+
+    fn write_docker_config(temp_dir: &TempDir, contents: &str) -> std::path::PathBuf {
+        let path = temp_dir.path().join("config.json");
+        fs::write(&path, contents).expect("write docker config");
+        path
+    }
+
+    #[test]
+    fn env_token_resolves() {
+        let _host = EnvGuard::remove(env::MSB_REGISTRY_HOST_ENV_VAR);
+        let _user = EnvGuard::remove(env::MSB_REGISTRY_USERNAME_ENV_VAR);
+        let _pass = EnvGuard::remove(env::MSB_REGISTRY_PASSWORD_ENV_VAR);
+        let _token = EnvGuard::set(env::MSB_REGISTRY_TOKEN_ENV_VAR, "token-abc");
+
+        let auth = resolve_env_auth().expect("resolve env").expect("auth");
+        assert!(matches!(auth, RegistryAuth::Bearer(t) if t == "token-abc"));
+    }
+
+    #[test]
+    fn env_basic_requires_both_fields() {
+        let _host = EnvGuard::remove(env::MSB_REGISTRY_HOST_ENV_VAR);
+        let _token = EnvGuard::remove(env::MSB_REGISTRY_TOKEN_ENV_VAR);
+        let _user = EnvGuard::set(env::MSB_REGISTRY_USERNAME_ENV_VAR, "user");
+        let _pass = EnvGuard::remove(env::MSB_REGISTRY_PASSWORD_ENV_VAR);
+
+        let err = resolve_env_auth().expect_err("missing password should error");
+        assert!(matches!(err, MicrosandboxError::ConfigValidation(_)));
+    }
+
+    #[test]
+    fn resolve_registry_auth_prefers_env() {
+        let _host = EnvGuard::remove(env::MSB_REGISTRY_HOST_ENV_VAR);
+        let _user = EnvGuard::remove(env::MSB_REGISTRY_USERNAME_ENV_VAR);
+        let _pass = EnvGuard::remove(env::MSB_REGISTRY_PASSWORD_ENV_VAR);
+        let _token = EnvGuard::set(env::MSB_REGISTRY_TOKEN_ENV_VAR, "token-xyz");
+
+        let temp = TempDir::new().expect("temp dir");
+        let config = r#"{
+  "auths": {
+    "registry.example.com": { "username": "user", "password": "pass" }
+  }
+}"#;
+        let path = write_docker_config(&temp, config);
+        let _docker_config = EnvGuard::set("DOCKER_CONFIG", path.to_string_lossy().to_string());
+
+        let reference: Reference = "registry.example.com/repo:latest".parse().unwrap();
+        let auth = resolve_registry_auth(&reference).expect("resolve auth");
+        assert!(matches!(auth, RegistryAuth::Bearer(t) if t == "token-xyz"));
+    }
+
+    #[test]
+    fn resolve_registry_auth_from_docker_config() {
+        let _token = EnvGuard::remove(env::MSB_REGISTRY_TOKEN_ENV_VAR);
+        let _user = EnvGuard::remove(env::MSB_REGISTRY_USERNAME_ENV_VAR);
+        let _pass = EnvGuard::remove(env::MSB_REGISTRY_PASSWORD_ENV_VAR);
+
+        let temp = TempDir::new().expect("temp dir");
+        let config = r#"{
+  "auths": {
+    "registry.example.com": { "username": "user", "password": "pass" }
+  }
+}"#;
+        let path = write_docker_config(&temp, config);
+        let _docker_config = EnvGuard::set("DOCKER_CONFIG", path.to_string_lossy().to_string());
+
+        let reference: Reference = "registry.example.com/repo:latest".parse().unwrap();
+        let auth = resolve_registry_auth(&reference).expect("resolve auth");
+        assert!(matches!(auth, RegistryAuth::Basic(u, p) if u == "user" && p == "pass"));
+    }
+
+    #[test]
+    fn resolve_registry_auth_defaults_anonymous_when_no_config() {
+        let _token = EnvGuard::remove(env::MSB_REGISTRY_TOKEN_ENV_VAR);
+        let _user = EnvGuard::remove(env::MSB_REGISTRY_USERNAME_ENV_VAR);
+        let _pass = EnvGuard::remove(env::MSB_REGISTRY_PASSWORD_ENV_VAR);
+
+        let temp = TempDir::new().expect("temp dir");
+        let _docker_config = EnvGuard::set("DOCKER_CONFIG", temp.path().to_string_lossy().to_string());
+
+        let reference: Reference = "registry.example.com/repo:latest".parse().unwrap();
+        let auth = resolve_registry_auth(&reference).expect("resolve auth");
+        assert!(matches!(auth, RegistryAuth::Anonymous));
+    }
 }
 
 //--------------------------------------------------------------------------------------------------
