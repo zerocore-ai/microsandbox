@@ -722,6 +722,10 @@ export MSB_REGISTRY_TOKEN=token123
 msb login ghcr.io --username user --password-stdin
 ```
 
+!!!note
+`msb login` stores credentials locally but does not validate them against the registry.
+!!!
+
 !!!warning Security
 Credentials are stored in `~/.microsandbox/registry_auth.json`. Restrict file permissions and avoid sharing it.
 !!!
