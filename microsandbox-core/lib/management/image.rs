@@ -264,7 +264,10 @@ fn convert_stored_credentials(creds: StoredRegistryCredentials) -> RegistryAuth 
 mod tests {
     use super::*;
     use std::{env as std_env, fs};
+    use std::sync::Mutex;
     use tempfile::TempDir;
+
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
 
     struct EnvGuard {
         key: &'static str,
@@ -274,13 +277,14 @@ mod tests {
     impl EnvGuard {
         fn set(key: &'static str, value: impl Into<std::ffi::OsString>) -> Self {
             let prev = std_env::var_os(key);
-            std_env::set_var(key, value);
+            let value: std::ffi::OsString = value.into();
+            unsafe { std_env::set_var(key, &value) };
             Self { key, prev }
         }
 
         fn remove(key: &'static str) -> Self {
             let prev = std_env::var_os(key);
-            std_env::remove_var(key);
+            unsafe { std_env::remove_var(key) };
             Self { key, prev }
         }
     }
@@ -288,9 +292,9 @@ mod tests {
     impl Drop for EnvGuard {
         fn drop(&mut self) {
             if let Some(value) = self.prev.take() {
-                std_env::set_var(self.key, value);
+                unsafe { std_env::set_var(self.key, value) };
             } else {
-                std_env::remove_var(self.key);
+                unsafe { std_env::remove_var(self.key) };
             }
         }
     }
@@ -303,6 +307,7 @@ mod tests {
 
     #[test]
     fn env_token_resolves() {
+        let _lock = ENV_LOCK.lock().unwrap();
         let _host = EnvGuard::remove(env::MSB_REGISTRY_HOST_ENV_VAR);
         let _user = EnvGuard::remove(env::MSB_REGISTRY_USERNAME_ENV_VAR);
         let _pass = EnvGuard::remove(env::MSB_REGISTRY_PASSWORD_ENV_VAR);
@@ -314,6 +319,7 @@ mod tests {
 
     #[test]
     fn env_basic_requires_both_fields() {
+        let _lock = ENV_LOCK.lock().unwrap();
         let _host = EnvGuard::remove(env::MSB_REGISTRY_HOST_ENV_VAR);
         let _token = EnvGuard::remove(env::MSB_REGISTRY_TOKEN_ENV_VAR);
         let _user = EnvGuard::set(env::MSB_REGISTRY_USERNAME_ENV_VAR, "user");
@@ -325,10 +331,13 @@ mod tests {
 
     #[test]
     fn resolve_registry_auth_prefers_env() {
+        let _lock = ENV_LOCK.lock().unwrap();
         let _host = EnvGuard::remove(env::MSB_REGISTRY_HOST_ENV_VAR);
         let _user = EnvGuard::remove(env::MSB_REGISTRY_USERNAME_ENV_VAR);
         let _pass = EnvGuard::remove(env::MSB_REGISTRY_PASSWORD_ENV_VAR);
         let _token = EnvGuard::set(env::MSB_REGISTRY_TOKEN_ENV_VAR, "token-xyz");
+        let msb_home = TempDir::new().expect("temp msb home");
+        let _msb_home = EnvGuard::set(env::MICROSANDBOX_HOME_ENV_VAR, msb_home.path());
 
         let temp = TempDir::new().expect("temp dir");
         let config = r#"{
@@ -346,9 +355,13 @@ mod tests {
 
     #[test]
     fn resolve_registry_auth_from_docker_config() {
+        let _lock = ENV_LOCK.lock().unwrap();
+        let _host = EnvGuard::remove(env::MSB_REGISTRY_HOST_ENV_VAR);
         let _token = EnvGuard::remove(env::MSB_REGISTRY_TOKEN_ENV_VAR);
         let _user = EnvGuard::remove(env::MSB_REGISTRY_USERNAME_ENV_VAR);
         let _pass = EnvGuard::remove(env::MSB_REGISTRY_PASSWORD_ENV_VAR);
+        let msb_home = TempDir::new().expect("temp msb home");
+        let _msb_home = EnvGuard::set(env::MICROSANDBOX_HOME_ENV_VAR, msb_home.path());
 
         let temp = TempDir::new().expect("temp dir");
         let config = r#"{
@@ -366,9 +379,13 @@ mod tests {
 
     #[test]
     fn resolve_registry_auth_defaults_anonymous_when_no_config() {
+        let _lock = ENV_LOCK.lock().unwrap();
+        let _host = EnvGuard::remove(env::MSB_REGISTRY_HOST_ENV_VAR);
         let _token = EnvGuard::remove(env::MSB_REGISTRY_TOKEN_ENV_VAR);
         let _user = EnvGuard::remove(env::MSB_REGISTRY_USERNAME_ENV_VAR);
         let _pass = EnvGuard::remove(env::MSB_REGISTRY_PASSWORD_ENV_VAR);
+        let msb_home = TempDir::new().expect("temp msb home");
+        let _msb_home = EnvGuard::set(env::MICROSANDBOX_HOME_ENV_VAR, msb_home.path());
 
         let temp = TempDir::new().expect("temp dir");
         let _docker_config = EnvGuard::set("DOCKER_CONFIG", temp.path().to_string_lossy().to_string());
