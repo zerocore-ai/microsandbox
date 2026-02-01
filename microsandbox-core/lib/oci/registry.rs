@@ -80,6 +80,7 @@ where
         db: Pool<Sqlite>,
         platform: Platform,
         global_cache: O,
+        auth: RegistryAuth,
     ) -> MicrosandboxResult<Self> {
         let config = OciClientConfig {
             platform_resolver: Some(Box::new(move |manifests| {
@@ -90,7 +91,7 @@ where
 
         Ok(Self {
             client: OciClient::new(config),
-            auth: RegistryAuth::Anonymous,
+            auth,
             db,
             global_cache,
         })
