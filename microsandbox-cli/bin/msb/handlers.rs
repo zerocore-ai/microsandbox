@@ -12,12 +12,12 @@ use microsandbox_core::{
 };
 use microsandbox_server::MicrosandboxServerResult;
 use microsandbox_utils::{
-    NAMESPACES_SUBDIR, StoredRegistryCredentials, env, remove_registry_credentials,
-    store_registry_credentials, clear_registry_credentials,
+    NAMESPACES_SUBDIR, StoredRegistryCredentials, clear_registry_credentials, env,
+    remove_registry_credentials, store_registry_credentials,
 };
 use std::{collections::HashMap, path::PathBuf};
-use typed_path::Utf8UnixPathBuf;
 use tokio::io::{self, AsyncReadExt};
+use typed_path::Utf8UnixPathBuf;
 
 //--------------------------------------------------------------------------------------------------
 // Constants
@@ -697,22 +697,19 @@ pub async fn login_subcommand(
             );
         }
         LoginCredentials::Token { token } => {
-            store_registry_credentials(
-                &registry,
-                StoredRegistryCredentials::Token { token },
-            )
-            .map_err(|err| MicrosandboxCliError::ConfigError(err.to_string()))?;
-            println!("info: token saved for registry {} (not validated)", registry);
+            store_registry_credentials(&registry, StoredRegistryCredentials::Token { token })
+                .map_err(|err| MicrosandboxCliError::ConfigError(err.to_string()))?;
+            println!(
+                "info: token saved for registry {} (not validated)",
+                registry
+            );
         }
     }
 
     Ok(())
 }
 
-pub async fn logout_subcommand(
-    registry: Option<String>,
-    all: bool,
-) -> MicrosandboxCliResult<()> {
+pub async fn logout_subcommand(registry: Option<String>, all: bool) -> MicrosandboxCliResult<()> {
     if all {
         clear_registry_credentials()
             .map_err(|err| MicrosandboxCliError::ConfigError(err.to_string()))?;
@@ -726,7 +723,10 @@ pub async fn logout_subcommand(
     if removed {
         println!("info: removed stored credentials for registry {}", registry);
     } else {
-        println!("info: no stored credentials found for registry {}", registry);
+        println!(
+            "info: no stored credentials found for registry {}",
+            registry
+        );
     }
 
     Ok(())

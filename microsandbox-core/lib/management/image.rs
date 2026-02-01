@@ -14,11 +14,11 @@ use futures::{StreamExt, future};
 use indicatif::{ProgressBar, ProgressStyle};
 #[cfg(feature = "cli")]
 use microsandbox_utils::term::{self, MULTI_PROGRESS};
-use microsandbox_utils::{EXTRACTED_LAYER_SUFFIX, LAYERS_SUBDIR, OCI_DB_FILENAME, env};
 use microsandbox_utils::{
     DockerAuthCredentials, StoredRegistryCredentials, load_docker_registry_credentials,
     load_stored_registry_credentials,
 };
+use microsandbox_utils::{EXTRACTED_LAYER_SUFFIX, LAYERS_SUBDIR, OCI_DB_FILENAME, env};
 use oci_client::secrets::RegistryAuth;
 use oci_spec::image::Platform;
 #[cfg(feature = "cli")]
@@ -99,8 +99,14 @@ pub async fn pull(image: Reference, layer_output_dir: Option<PathBuf>) -> Micros
     let db_path = microsandbox_home_path.join(OCI_DB_FILENAME);
     let db = db::get_or_create_pool(&db_path, &db::OCI_DB_MIGRATOR).await?;
     let auth = resolve_registry_auth(&image)?;
-    let registry =
-        Registry::new(temp_download_dir, db.clone(), Platform::default(), layer, auth).await?;
+    let registry = Registry::new(
+        temp_download_dir,
+        db.clone(),
+        Platform::default(),
+        layer,
+        auth,
+    )
+    .await?;
 
     // Use custom layer_output_dir if specified, otherwise use default microsandbox layers directory
     let layers_dir = layer_output_dir.unwrap_or_else(|| microsandbox_home_path.join(LAYERS_SUBDIR));
@@ -271,8 +277,8 @@ fn convert_stored_credentials(creds: StoredRegistryCredentials) -> RegistryAuth 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{env as std_env, fs};
     use std::sync::Mutex;
+    use std::{env as std_env, fs};
     use tempfile::TempDir;
 
     static ENV_LOCK: Mutex<()> = Mutex::new(());
@@ -396,7 +402,8 @@ mod tests {
         let _msb_home = EnvGuard::set(env::MICROSANDBOX_HOME_ENV_VAR, msb_home.path());
 
         let temp = TempDir::new().expect("temp dir");
-        let _docker_config = EnvGuard::set("DOCKER_CONFIG", temp.path().to_string_lossy().to_string());
+        let _docker_config =
+            EnvGuard::set("DOCKER_CONFIG", temp.path().to_string_lossy().to_string());
 
         let reference: Reference = "registry.example.com/repo:latest".parse().unwrap();
         let auth = resolve_registry_auth(&reference).expect("resolve auth");
