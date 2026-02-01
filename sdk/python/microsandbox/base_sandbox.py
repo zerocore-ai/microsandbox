@@ -9,12 +9,14 @@ from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
 from typing import Optional
 
+import logging
 import aiohttp
 from dotenv import load_dotenv
 
 from .command import Command
 from .metrics import Metrics
 
+logger = logging.getLogger(__name__)
 
 class BaseSandbox(ABC):
     """
@@ -151,6 +153,13 @@ class BaseSandbox(ABC):
         """
         if self._is_started:
             return
+
+        if cpus < 1.0:
+            import platform
+
+            if platform.system() != "Linux":
+                logger.error("Fractional CPUs are only supported on Linux. Rounding up to 1 CPU.")
+                cpus = 1.0
 
         sandbox_image = image or await self.get_default_image()
         request_data = {
