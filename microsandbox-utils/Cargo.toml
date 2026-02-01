@@ -14,6 +14,7 @@ path = "lib/lib.rs"
 [dependencies]
 anyhow.workspace = true
 async-trait.workspace = true
+base64.workspace = true
 console.workspace = true
 dirs.workspace = true
 futures.workspace = true
@@ -21,6 +22,8 @@ indicatif.workspace = true
 libc.workspace = true
 nix = { workspace = true, features = ["fs", "process", "signal", "term"] }
 pretty-error-debug.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 tracing.workspace = true
