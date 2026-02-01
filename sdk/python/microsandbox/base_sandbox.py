@@ -158,7 +158,10 @@ class BaseSandbox(ABC):
             import platform
 
             if platform.system() != "Linux":
-                logger.error("Fractional CPUs are only supported on Linux. Rounding up to 1 CPU.")
+                logger.warning(
+                    "Fractional CPUs are only supported on Linux. "
+                    "Using default cpus=1.0."
+                )
                 cpus = 1.0
 
         sandbox_image = image or await self.get_default_image()
