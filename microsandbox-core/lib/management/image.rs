@@ -186,7 +186,14 @@ where
 // Functions: Auth resolution
 //--------------------------------------------------------------------------------------------------
 
-fn resolve_registry_auth(reference: &Reference) -> MicrosandboxResult<RegistryAuth> {
+/// Resolve registry authentication for a given image reference.
+///
+/// This uses the following precedence:
+/// 1) Environment variables
+/// 2) Stored credentials (msb login)
+/// 3) Docker config (auths/cred helpers)
+/// 4) Anonymous
+pub fn resolve_registry_auth(reference: &Reference) -> MicrosandboxResult<RegistryAuth> {
     let registry = reference.registry();
     if let Some(auth) = resolve_env_auth()? {
         return Ok(auth);
