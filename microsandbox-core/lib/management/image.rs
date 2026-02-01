@@ -15,10 +15,10 @@ use indicatif::{ProgressBar, ProgressStyle};
 #[cfg(feature = "cli")]
 use microsandbox_utils::term::{self, MULTI_PROGRESS};
 use microsandbox_utils::{
-    DockerAuthCredentials, StoredRegistryCredentials, load_docker_registry_credentials,
+    DockerAuthCredentials, EXTRACTED_LAYER_SUFFIX, LAYERS_SUBDIR, OCI_DB_FILENAME,
+    StoredRegistryCredentials, env, load_docker_registry_credentials,
     load_stored_registry_credentials,
 };
-use microsandbox_utils::{EXTRACTED_LAYER_SUFFIX, LAYERS_SUBDIR, OCI_DB_FILENAME, env};
 use oci_client::secrets::RegistryAuth;
 use oci_spec::image::Platform;
 #[cfg(feature = "cli")]
@@ -277,8 +277,7 @@ fn convert_stored_credentials(creds: StoredRegistryCredentials) -> RegistryAuth 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::Mutex;
-    use std::{env as std_env, fs};
+    use std::{env as std_env, fs, sync::Mutex};
     use tempfile::TempDir;
 
     static ENV_LOCK: Mutex<()> = Mutex::new(());

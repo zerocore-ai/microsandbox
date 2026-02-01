@@ -1,9 +1,8 @@
 use std::sync::Mutex;
 
 use microsandbox_core::{management::image::resolve_registry_auth, oci::Reference};
-use microsandbox_utils::env;
 use microsandbox_utils::{
-    StoredRegistryCredentials, clear_registry_credentials, store_registry_credentials,
+    StoredRegistryCredentials, clear_registry_credentials, env, store_registry_credentials,
 };
 use tempfile::TempDir;
 
