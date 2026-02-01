@@ -11,9 +11,13 @@ use microsandbox_core::{
     oci::Reference,
 };
 use microsandbox_server::MicrosandboxServerResult;
-use microsandbox_utils::{NAMESPACES_SUBDIR, env};
+use microsandbox_utils::{
+    NAMESPACES_SUBDIR, StoredRegistryCredentials, env, remove_registry_credentials,
+    store_registry_credentials, clear_registry_credentials,
+};
 use std::{collections::HashMap, path::PathBuf};
 use typed_path::Utf8UnixPathBuf;
+use tokio::io::{self, AsyncReadExt};
 
 //--------------------------------------------------------------------------------------------------
 // Constants
@@ -671,11 +675,57 @@ pub async fn server_status_subcommand(
     Ok(())
 }
 
-pub async fn login_subcommand() -> MicrosandboxCliResult<()> {
-    println!(
-        "{} login functionality is not yet implemented",
-        "error:".error()
-    );
+pub async fn login_subcommand(
+    registry: Option<String>,
+    username: Option<String>,
+    password_stdin: bool,
+    token: Option<String>,
+) -> MicrosandboxCliResult<()> {
+    let registry = resolve_registry_host(registry);
+    let creds = resolve_login_credentials(username, password_stdin, token).await?;
+
+    match creds {
+        LoginCredentials::Basic { username, password } => {
+            store_registry_credentials(
+                &registry,
+                StoredRegistryCredentials::Basic { username, password },
+            )
+            .map_err(|err| MicrosandboxCliError::ConfigError(err.to_string()))?;
+            println!("info: credentials saved for registry {}", registry);
+        }
+        LoginCredentials::Token { token } => {
+            store_registry_credentials(
+                &registry,
+                StoredRegistryCredentials::Token { token },
+            )
+            .map_err(|err| MicrosandboxCliError::ConfigError(err.to_string()))?;
+            println!("info: token saved for registry {}", registry);
+        }
+    }
+
+    Ok(())
+}
+
+pub async fn logout_subcommand(
+    registry: Option<String>,
+    all: bool,
+) -> MicrosandboxCliResult<()> {
+    if all {
+        clear_registry_credentials()
+            .map_err(|err| MicrosandboxCliError::ConfigError(err.to_string()))?;
+        println!("info: cleared all stored registry credentials");
+        return Ok(());
+    }
+
+    let registry = resolve_registry_host(registry);
+    let removed = remove_registry_credentials(&registry)
+        .map_err(|err| MicrosandboxCliError::ConfigError(err.to_string()))?;
+    if removed {
+        println!("info: removed stored credentials for registry {}", registry);
+    } else {
+        println!("info: no stored credentials found for registry {}", registry);
+    }
+
     Ok(())
 }
 
@@ -739,6 +789,100 @@ fn parse_name_and_script(name_and_script: &str) -> (&str, Option<&str>) {
     };
 
     (name, script)
+}
+
+//--------------------------------------------------------------------------------------------------
+// Functions: Login Helpers
+//--------------------------------------------------------------------------------------------------
+
+enum LoginCredentials {
+    Basic { username: String, password: String },
+    Token { token: String },
+}
+
+fn resolve_registry_host(registry: Option<String>) -> String {
+    registry
+        .or_else(env::get_registry_host)
+        .unwrap_or_else(env::get_oci_registry)
+}
+
+async fn resolve_login_credentials(
+    username: Option<String>,
+    password_stdin: bool,
+    token: Option<String>,
+) -> MicrosandboxCliResult<LoginCredentials> {
+    let cli_password = if password_stdin {
+        Some(read_password_from_stdin().await?)
+    } else {
+        None
+    };
+
+    let cli_provided = token.is_some() || username.is_some() || password_stdin;
+    if cli_provided {
+        let cli_result = if token.is_some() && (username.is_some() || cli_password.is_some()) {
+            Err(MicrosandboxCliError::InvalidArgument(
+                "token cannot be combined with username/password".to_string(),
+            ))
+        } else if let Some(token) = token {
+            Ok(LoginCredentials::Token { token })
+        } else {
+            match (username, cli_password) {
+                (Some(username), Some(password)) => {
+                    Ok(LoginCredentials::Basic { username, password })
+                }
+                (None, None) => Err(MicrosandboxCliError::InvalidArgument(
+                    "no credentials provided; use flags or environment variables".to_string(),
+                )),
+                _ => Err(MicrosandboxCliError::InvalidArgument(
+                    "both username and password are required".to_string(),
+                )),
+            }
+        };
+
+        if let Ok(creds) = cli_result {
+            return Ok(creds);
+        }
+
+        // CLI was provided but invalid; attempt env fallback.
+        tracing::debug!("login: CLI credentials invalid, falling back to environment variables");
+    }
+
+    let env_token = env::get_registry_token();
+    let env_username = env::get_registry_username();
+    let env_password = env::get_registry_password();
+
+    if env_token.is_some() && (env_username.is_some() || env_password.is_some()) {
+        return Err(MicrosandboxCliError::InvalidArgument(
+            "token cannot be combined with username/password".to_string(),
+        ));
+    }
+
+    if let Some(token) = env_token {
+        return Ok(LoginCredentials::Token { token });
+    }
+
+    match (env_username, env_password) {
+        (Some(username), Some(password)) => Ok(LoginCredentials::Basic { username, password }),
+        (None, None) => Err(MicrosandboxCliError::InvalidArgument(
+            "no credentials provided; use flags or environment variables".to_string(),
+        )),
+        _ => Err(MicrosandboxCliError::InvalidArgument(
+            "both username and password are required".to_string(),
+        )),
+    }
+}
+
+async fn read_password_from_stdin() -> MicrosandboxCliResult<String> {
+    let mut input = String::new();
+    let mut stdin = io::stdin();
+    stdin.read_to_string(&mut input).await?;
+    let password = input.trim_end_matches(&['\n', '\r'][..]).to_string();
+    if password.is_empty() {
+        return Err(MicrosandboxCliError::InvalidArgument(
+            "password provided via stdin is empty".to_string(),
+        ));
+    }
+    Ok(password)
 }
 
 /// Parse a file path into project path and config file name.
