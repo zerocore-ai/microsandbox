@@ -149,7 +149,7 @@ class BaseSandbox(ABC):
                 "config": {
                     "image": sandbox_image,
                     "memory": memory,
-                    "cpus": int(round(cpus)),
+                    "cpus": cpus,
                 },
             },
             "id": str(uuid.uuid4()),
