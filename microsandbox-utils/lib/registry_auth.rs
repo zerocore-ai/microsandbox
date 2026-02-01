@@ -1,4 +1,27 @@
 //! Registry auth persistence helpers.
+//!
+//! # Examples
+//! ```no_run
+//! use microsandbox_utils::{store_registry_credentials, load_stored_registry_credentials, StoredRegistryCredentials};
+//!
+//! store_registry_credentials(
+//!     "ghcr.io",
+//!     StoredRegistryCredentials::Token {
+//!         token: "token-123".to_string(),
+//!     },
+//! )?;
+//!
+//! let creds = load_stored_registry_credentials("ghcr.io")?
+//!     .expect("missing credentials");
+//!
+//! match creds {
+//!     StoredRegistryCredentials::Token { token } => {
+//!         assert_eq!(token, "token-123");
+//!     }
+//!     _ => unreachable!("expected token credentials"),
+//! }
+//! # Ok::<(), microsandbox_utils::MicrosandboxUtilsError>(())
+//! ```
 
 use std::{
     collections::HashMap,
