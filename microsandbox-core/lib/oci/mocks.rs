@@ -23,8 +23,13 @@ pub(crate) async fn mock_registry_and_db() -> (Registry<GlobalCache>, Pool<Sqlit
     let layer_ops = GlobalCache::new(layers_tar_dir, extracted_layers_dir, db.clone())
         .await
         .expect("global cache to be initialized");
-    let registry = Registry::new(db.clone(), platform, layer_ops)
-        .await
-        .unwrap();
+    let registry = Registry::new(
+        db.clone(),
+        platform,
+        layer_ops,
+        oci_client::secrets::RegistryAuth::Anonymous,
+    )
+    .await
+    .unwrap();
     (registry, db, temp_dir)
 }
