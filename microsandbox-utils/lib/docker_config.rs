@@ -172,9 +172,7 @@ fn parse_auth_entry(entry: &DockerAuthEntry) -> Result<DockerAuthCredentials, Do
 
     if let Some(encoded) = entry.auth.as_ref() {
         if encoded.is_empty() {
-            return Err(DockerConfigError::InvalidAuth(
-                "auth is empty".to_string(),
-            ));
+            return Err(DockerConfigError::InvalidAuth("auth is empty".to_string()));
         }
         let decoded = BASE64_STANDARD.decode(encoded)?;
         let decoded = String::from_utf8_lossy(&decoded);
@@ -216,10 +214,10 @@ fn load_from_helpers(
 }
 
 fn select_credential_helper(host: &str, config: &DockerConfig) -> Option<String> {
-    if let Some(helpers) = config.cred_helpers.as_ref() {
-        if let Some(helper) = helpers.get(host) {
-            return Some(helper.to_string());
-        }
+    if let Some(helpers) = config.cred_helpers.as_ref()
+        && let Some(helper) = helpers.get(host)
+    {
+        return Some(helper.to_string());
     }
 
     config.creds_store.as_ref().map(|v| v.to_string())
@@ -256,9 +254,7 @@ fn run_credential_helper(
     Ok(Some(creds))
 }
 
-fn parse_credential_helper_output(
-    raw: &[u8],
-) -> Result<DockerAuthCredentials, DockerConfigError> {
+fn parse_credential_helper_output(raw: &[u8]) -> Result<DockerAuthCredentials, DockerConfigError> {
     #[derive(Deserialize)]
     struct HelperOutput {
         #[allow(dead_code)]
