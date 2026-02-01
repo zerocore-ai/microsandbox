@@ -92,8 +92,6 @@ struct DockerAuthEntry {
 //--------------------------------------------------------------------------------------------------
 
 /// Loads credentials for a registry host from Docker config if present.
-///
-/// TODO: Support credsStore / credHelpers by invoking docker-credential helpers.
 pub fn load_docker_registry_credentials(
     host: &str,
 ) -> Result<Option<DockerAuthCredentials>, DockerConfigError> {
