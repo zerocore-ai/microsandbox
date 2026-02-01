@@ -646,6 +646,15 @@ msb pull [--image] [--image-group] <name> [options]
 **Examples:**
 
 ```bash
+# Pull a private image using env credentials (token)
+export MSB_REGISTRY_TOKEN=token123
+msb pull registry.example.com/org/app:1.0
+
+# Pull a private image using env credentials (username/password)
+export MSB_REGISTRY_USERNAME=user
+export MSB_REGISTRY_PASSWORD=pass
+msb pull registry.example.com/org/app:1.0
+
 # Pull an image
 msb pull --image python:3.11
 
@@ -682,6 +691,62 @@ msb push --image myapp:latest
 
 # Push an image (--image is default)
 msb push myapp:latest
+```
+
+===
+
+==- `msb login`
+Set registry credentials (persisted in microsandbox home).
+
+```bash
+msb login [registry] [--username <user>] [--password-stdin] [--token <token>]
+```
+
+| Option            | Description                        |
+| ----------------- | ---------------------------------- |
+| `--username`      | Registry username                  |
+| `--password-stdin`| Read password from stdin           |
+| `--token`         | Registry access token (bearer)     |
+
+**Examples:**
+
+```bash
+# Provide a token
+msb login ghcr.io --token token123
+
+# Provide username and password via stdin
+echo "pass" | msb login docker.io --username user --password-stdin
+
+# Use env fallback if CLI is invalid
+export MSB_REGISTRY_TOKEN=token123
+msb login ghcr.io --username user --password-stdin
+```
+
+!!!warning Security
+Credentials are stored in `~/.microsandbox/registry_auth.json`. Restrict file permissions and avoid sharing it.
+!!!
+
+===
+
+==- `msb logout`
+Remove stored registry credentials.
+
+```bash
+msb logout [registry] [--all]
+```
+
+| Option    | Description                              |
+| --------- | ---------------------------------------- |
+| `--all`   | Remove all stored registry credentials   |
+
+**Examples:**
+
+```bash
+# Remove credentials for a registry
+msb logout ghcr.io
+
+# Remove all stored credentials
+msb logout --all
 ```
 
 ===
