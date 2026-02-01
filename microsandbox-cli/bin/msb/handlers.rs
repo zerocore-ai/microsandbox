@@ -691,7 +691,10 @@ pub async fn login_subcommand(
                 StoredRegistryCredentials::Basic { username, password },
             )
             .map_err(|err| MicrosandboxCliError::ConfigError(err.to_string()))?;
-            println!("info: credentials saved for registry {}", registry);
+            println!(
+                "info: credentials saved for registry {} (not validated)",
+                registry
+            );
         }
         LoginCredentials::Token { token } => {
             store_registry_credentials(
@@ -699,7 +702,7 @@ pub async fn login_subcommand(
                 StoredRegistryCredentials::Token { token },
             )
             .map_err(|err| MicrosandboxCliError::ConfigError(err.to_string()))?;
-            println!("info: token saved for registry {}", registry);
+            println!("info: token saved for registry {} (not validated)", registry);
         }
     }
 
