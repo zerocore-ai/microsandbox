@@ -20,8 +20,14 @@ pub(crate) async fn mock_registry_and_db() -> (Registry<GlobalLayerCache>, Pool<
 
     let platform = Platform::default();
     let layer_ops = GlobalLayerCache::default();
-    let registry = Registry::new(download_dir, db.clone(), platform, layer_ops)
-        .await
-        .unwrap();
+    let registry = Registry::new(
+        download_dir,
+        db.clone(),
+        platform,
+        layer_ops,
+        oci_client::secrets::RegistryAuth::Anonymous,
+    )
+    .await
+    .unwrap();
     (registry, db, temp_dir)
 }
