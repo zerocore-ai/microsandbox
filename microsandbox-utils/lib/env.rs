@@ -14,11 +14,29 @@ pub const MICROSANDBOX_HOME_ENV_VAR: &str = "MICROSANDBOX_HOME";
 /// Environment variable for the OCI registry domain
 pub const OCI_REGISTRY_ENV_VAR: &str = "OCI_REGISTRY_DOMAIN";
 
+/// Environment variable for registry host (CLI fallback)
+pub const MSB_REGISTRY_HOST_ENV_VAR: &str = "MSB_REGISTRY_HOST";
+
+/// Environment variable for registry username
+pub const MSB_REGISTRY_USERNAME_ENV_VAR: &str = "MSB_REGISTRY_USERNAME";
+
+/// Environment variable for registry password
+pub const MSB_REGISTRY_PASSWORD_ENV_VAR: &str = "MSB_REGISTRY_PASSWORD";
+
+/// Environment variable for registry token
+pub const MSB_REGISTRY_TOKEN_ENV_VAR: &str = "MSB_REGISTRY_TOKEN";
+
 /// Environment variable for the msbrun binary path
 pub const MSBRUN_EXE_ENV_VAR: &str = "MSBRUN_EXE";
 
 /// Environment variable for the msbserver binary path
 pub const MSBSERVER_EXE_ENV_VAR: &str = "MSBSERVER_EXE";
+
+/// Environment variable for the minimum port in the sandbox port range
+pub const MICROSANDBOX_PORT_MIN_ENV_VAR: &str = "MICROSANDBOX_PORT_MIN";
+
+/// Environment variable for the maximum port in the sandbox port range
+pub const MICROSANDBOX_PORT_MAX_ENV_VAR: &str = "MICROSANDBOX_PORT_MAX";
 
 //--------------------------------------------------------------------------------------------------
 // Functions
@@ -43,5 +61,42 @@ pub fn get_oci_registry() -> String {
         oci_registry_domain
     } else {
         DEFAULT_OCI_REGISTRY.to_string()
+    }
+}
+
+/// Returns the registry host from environment, if set.
+pub fn get_registry_host() -> Option<String> {
+    std::env::var(MSB_REGISTRY_HOST_ENV_VAR).ok()
+}
+
+/// Returns the registry username from environment, if set.
+pub fn get_registry_username() -> Option<String> {
+    std::env::var(MSB_REGISTRY_USERNAME_ENV_VAR).ok()
+}
+
+/// Returns the registry password from environment, if set.
+pub fn get_registry_password() -> Option<String> {
+    std::env::var(MSB_REGISTRY_PASSWORD_ENV_VAR).ok()
+}
+
+/// Returns the registry token from environment, if set.
+pub fn get_registry_token() -> Option<String> {
+    std::env::var(MSB_REGISTRY_TOKEN_ENV_VAR).ok()
+}
+
+/// Returns the port range for sandbox port allocation.
+/// If both MICROSANDBOX_PORT_MIN and MICROSANDBOX_PORT_MAX are set,
+/// returns Some((min, max)). Otherwise, returns None for dynamic allocation.
+pub fn get_sandbox_port_range() -> Option<(u16, u16)> {
+    let min = std::env::var(MICROSANDBOX_PORT_MIN_ENV_VAR)
+        .ok()
+        .and_then(|v| v.parse::<u16>().ok());
+    let max = std::env::var(MICROSANDBOX_PORT_MAX_ENV_VAR)
+        .ok()
+        .and_then(|v| v.parse::<u16>().ok());
+
+    match (min, max) {
+        (Some(min_val), Some(max_val)) if min_val <= max_val => Some((min_val, max_val)),
+        _ => None,
     }
 }
