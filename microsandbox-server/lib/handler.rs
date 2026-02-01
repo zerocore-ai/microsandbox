@@ -399,6 +399,16 @@ pub async fn sandbox_start_impl(
         ));
     }
 
+    let mut adjusted_config = params.config.clone();
+    if let Some(config) = adjusted_config.as_mut()
+        && let Some(cpus) = config.cpus
+        && cpus < 1.0
+        && !cfg!(target_os = "linux")
+    {
+        tracing::warn!("fractional CPUs are only supported on Linux; using cpus=1.0");
+        config.cpus = Some(1.0);
+    }
+
     // Load or create the config
     let mut config_yaml: serde_yaml::Value;
 
@@ -478,7 +488,7 @@ pub async fn sandbox_start_impl(
     let sandboxes_map = sandboxes_value.as_mapping_mut().unwrap();
 
     // If config is provided and we have an image, update the sandbox configuration
-    if let Some(config) = &params.config
+    if let Some(config) = &adjusted_config
         && config.image.is_some()
     {
         // Create or update sandbox entry
