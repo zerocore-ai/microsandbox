@@ -92,6 +92,7 @@ where
         db: Pool<Sqlite>,
         platform: Platform,
         layer_ops: T,
+        auth: RegistryAuth,
     ) -> MicrosandboxResult<Self> {
         let config = OciClientConfig {
             platform_resolver: Some(Box::new(move |manifests| {
@@ -102,7 +103,7 @@ where
 
         Ok(Self {
             client: OciClient::new(config),
-            auth: RegistryAuth::Anonymous,
+            auth,
             layer_download_dir: layer_download_dir.into(),
             db,
             global_cache: layer_ops,
