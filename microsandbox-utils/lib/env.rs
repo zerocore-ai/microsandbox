@@ -14,6 +14,18 @@ pub const MICROSANDBOX_HOME_ENV_VAR: &str = "MICROSANDBOX_HOME";
 /// Environment variable for the OCI registry domain
 pub const OCI_REGISTRY_ENV_VAR: &str = "OCI_REGISTRY_DOMAIN";
 
+/// Environment variable for registry host (CLI fallback)
+pub const MSB_REGISTRY_HOST_ENV_VAR: &str = "MSB_REGISTRY_HOST";
+
+/// Environment variable for registry username
+pub const MSB_REGISTRY_USERNAME_ENV_VAR: &str = "MSB_REGISTRY_USERNAME";
+
+/// Environment variable for registry password
+pub const MSB_REGISTRY_PASSWORD_ENV_VAR: &str = "MSB_REGISTRY_PASSWORD";
+
+/// Environment variable for registry token
+pub const MSB_REGISTRY_TOKEN_ENV_VAR: &str = "MSB_REGISTRY_TOKEN";
+
 /// Environment variable for the msbrun binary path
 pub const MSBRUN_EXE_ENV_VAR: &str = "MSBRUN_EXE";
 
@@ -50,6 +62,26 @@ pub fn get_oci_registry() -> String {
     } else {
         DEFAULT_OCI_REGISTRY.to_string()
     }
+}
+
+/// Returns the registry host from environment, if set.
+pub fn get_registry_host() -> Option<String> {
+    std::env::var(MSB_REGISTRY_HOST_ENV_VAR).ok()
+}
+
+/// Returns the registry username from environment, if set.
+pub fn get_registry_username() -> Option<String> {
+    std::env::var(MSB_REGISTRY_USERNAME_ENV_VAR).ok()
+}
+
+/// Returns the registry password from environment, if set.
+pub fn get_registry_password() -> Option<String> {
+    std::env::var(MSB_REGISTRY_PASSWORD_ENV_VAR).ok()
+}
+
+/// Returns the registry token from environment, if set.
+pub fn get_registry_token() -> Option<String> {
+    std::env::var(MSB_REGISTRY_TOKEN_ENV_VAR).ok()
 }
 
 /// Returns the port range for sandbox port allocation.
