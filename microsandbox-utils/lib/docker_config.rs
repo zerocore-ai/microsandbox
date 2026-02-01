@@ -1,4 +1,16 @@
 //! Docker config reader utilities for registry authentication.
+//!
+//! # Examples
+//! ```no_run
+//! use microsandbox_utils::load_docker_registry_credentials;
+//!
+//! let creds = load_docker_registry_credentials("ghcr.io")
+//!     .map_err(|err| microsandbox_utils::MicrosandboxUtilsError::custom(err))?;
+//! if let Some(creds) = creds {
+//!     println!("loaded docker credentials: {:?}", creds);
+//! }
+//! # Ok::<(), microsandbox_utils::MicrosandboxUtilsError>(())
+//! ```
 
 use std::{
     collections::HashMap,
