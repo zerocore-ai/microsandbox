@@ -89,7 +89,7 @@ pub struct MicroVmConfigBuilder<R, E> {
 /// let vm = MicroVmBuilder::default()
 ///     .log_level(LogLevel::Debug)
 ///     .rootfs(Rootfs::Native(PathBuf::from("/tmp")))
-///     .num_vcpus(2)
+///     .num_vcpus(2.0)
 ///     .memory_mib(1024)
 ///     .mapped_dirs(["/home:/guest/mount".parse()?])
 ///     .port_map(["8080:80".parse()?])
@@ -658,7 +658,8 @@ impl<R, M> MicroVmBuilder<R, M> {
 
     /// Sets the number of virtual CPUs (vCPUs) for the MicroVm.
     ///
-    /// This determines how many CPU cores are available to the guest system.
+    /// This determines how many CPU cores are available to the guest system and
+    /// supports fractional CPU values where supported.
     ///
     /// ## Examples
     ///
@@ -671,7 +672,7 @@ impl<R, M> MicroVmBuilder<R, M> {
     /// let vm = MicroVmBuilder::default()
     ///     .rootfs(Rootfs::Native(temp_dir.path().to_path_buf()))
     ///     .memory_mib(1024)
-    ///     .num_vcpus(2)  // Allocate 2 virtual CPU cores
+    ///     .num_vcpus(2.0)  // Allocate 2 virtual CPU cores
     ///     .exec_path("/bin/echo")
     ///     .build()?;
     /// # Ok(())
@@ -681,8 +682,11 @@ impl<R, M> MicroVmBuilder<R, M> {
     /// ## Notes
     /// - The default is 1 vCPU if not specified
     /// - More vCPUs aren't always better - consider the workload's needs
-    pub fn num_vcpus(mut self, num_vcpus: u8) -> Self {
-        self.inner = self.inner.num_vcpus(num_vcpus as f32);
+    pub fn num_vcpus<T>(mut self, num_vcpus: T) -> Self
+    where
+        T: Into<f32>,
+    {
+        self.inner = self.inner.num_vcpus(num_vcpus.into());
         self
     }
 
@@ -1138,7 +1142,7 @@ mod tests {
         let builder = MicroVmBuilder::default()
             .log_level(LogLevel::Debug)
             .rootfs(rootfs.clone())
-            .num_vcpus(2)
+            .num_vcpus(2u8)
             .memory_mib(1024)
             .mapped_dirs(["/guest/mount:/host/mount".parse()?])
             .port_map(["8080:80".parse()?])
