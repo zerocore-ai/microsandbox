@@ -78,7 +78,7 @@ pub enum MicrosandboxSubcommand {
 
         /// Number of CPUs
         #[arg(long, alias = "cpu")]
-        cpus: Option<u32>,
+        cpus: Option<f32>,
 
         /// Volume mappings, format: <host_path>:<container_path>
         #[arg(short, long = "volume", name = "VOLUME")]
@@ -290,7 +290,7 @@ pub enum MicrosandboxSubcommand {
 
         /// Number of CPUs
         #[arg(long, alias = "cpu")]
-        cpus: Option<u8>,
+        cpus: Option<f32>,
 
         /// Memory in MB
         #[arg(long)]
@@ -342,7 +342,7 @@ pub enum MicrosandboxSubcommand {
 
         /// Number of CPUs
         #[arg(long, alias = "cpu")]
-        cpus: Option<u8>,
+        cpus: Option<f32>,
 
         /// Memory in MB
         #[arg(long)]
