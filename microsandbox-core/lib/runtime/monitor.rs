@@ -60,6 +60,13 @@ pub struct MicroVmMonitor {
 
     /// Whether to forward output to stdout/stderr
     forward_output: bool,
+
+    /// The requested number of CPUs, if provided
+    num_vcpus: Option<f32>,
+
+    /// The cgroup name used for throttling (Linux only)
+    #[cfg(target_os = "linux")]
+    cgroup_name: Option<String>,
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -78,6 +85,7 @@ impl MicroVmMonitor {
         log_dir: impl Into<PathBuf>,
         rootfs: Rootfs,
         forward_output: bool,
+        num_vcpus: Option<f32>,
     ) -> MicrosandboxResult<Self> {
         Ok(Self {
             supervisor_pid,
@@ -90,6 +98,9 @@ impl MicroVmMonitor {
             rootfs,
             original_term: None,
             forward_output,
+            num_vcpus,
+            #[cfg(target_os = "linux")]
+            cgroup_name: None,
         })
     }
 
@@ -113,6 +124,94 @@ impl MicroVmMonitor {
         // Place the log file inside that directory with the sandbox name
         config_dir.join(format!("{}.{}", self.sandbox_name, LOG_SUFFIX))
     }
+
+    #[cfg(target_os = "linux")]
+    fn build_cgroup_name(&self) -> String {
+        format!(
+            "{}_{}",
+            sanitize_cgroup_segment(&self.config_file),
+            sanitize_cgroup_segment(&self.sandbox_name)
+        )
+    }
+
+    fn maybe_apply_cpu_quota(&mut self, microvm_pid: u32) {
+        let Some(num_vcpus) = self.num_vcpus else {
+            return;
+        };
+
+        if num_vcpus >= 1.0 {
+            return;
+        }
+
+        #[cfg(target_os = "linux")]
+        {
+            if !crate::vm::has_cgroup_v2() {
+                // TODO: consider emitting a structured event for monitoring instead of a log.
+                tracing::warn!(
+                    "cgroups v2 not available; skipping CPU throttle for {}",
+                    self.sandbox_name
+                );
+                return;
+            }
+
+            let cgroup_name = self.build_cgroup_name();
+            match crate::vm::apply_cpu_quota(microvm_pid, num_vcpus, &cgroup_name) {
+                Ok(quota) => tracing::info!(
+                    "applied cgroup CPU quota: cpus={:.2}, quota_us={}, period_us={}",
+                    num_vcpus,
+                    quota.quota_us,
+                    quota.period_us
+                ),
+                Err(e) => tracing::warn!(
+                    error = %e,
+                    "failed to apply cgroup CPU quota for {}",
+                    self.sandbox_name
+                ),
+            }
+            self.cgroup_name = Some(cgroup_name);
+        }
+
+        #[cfg(not(target_os = "linux"))]
+        {
+            let _ = microvm_pid;
+            // TODO: consider surfacing this as a user-facing warning in non-Linux environments.
+            tracing::warn!(
+                "CPU throttling via cgroups is only available on Linux; skipping for {}",
+                self.sandbox_name
+            );
+        }
+    }
+
+    fn maybe_cleanup_cgroup(&mut self) {
+        #[cfg(target_os = "linux")]
+        {
+            let Some(cgroup_name) = self.cgroup_name.take() else {
+                return;
+            };
+
+            if !crate::vm::has_cgroup_v2() {
+                return;
+            }
+
+            if let Err(e) = crate::vm::cleanup_cgroup(&cgroup_name) {
+                tracing::warn!(error = %e, "failed to cleanup cgroup {}", cgroup_name);
+            }
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn sanitize_cgroup_segment(input: &str) -> String {
+    input
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect()
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -162,6 +261,8 @@ impl ProcessMonitor for MicroVmMonitor {
         )
         .await
         .map_err(MicrosandboxUtilsError::custom)?;
+
+        self.maybe_apply_cpu_quota(microvm_pid);
 
         match child_io {
             ChildIo::Piped {
@@ -318,6 +419,8 @@ impl ProcessMonitor for MicroVmMonitor {
         // Restore terminal settings if they were modified
         self.restore_terminal_settings();
 
+        self.maybe_cleanup_cgroup();
+
         // Update sandbox status to stopped
         db::update_sandbox_status(
             &self.sandbox_db,
@@ -338,5 +441,6 @@ impl ProcessMonitor for MicroVmMonitor {
 impl Drop for MicroVmMonitor {
     fn drop(&mut self) {
         self.restore_terminal_settings();
+        self.maybe_cleanup_cgroup();
     }
 }
