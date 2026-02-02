@@ -421,7 +421,7 @@ pub async fn prepare_run(
 ///     sandbox::run_temp(
 ///         &image,
 ///         Some("start"),     // Script name
-///         Some(2),           // 2 CPUs
+///         Some(2.0),           // 2 CPUs
 ///         Some(1024),        // 1GB RAM
 ///         vec![              // Mount host's /tmp to sandbox's /data
 ///             "/tmp:/data".to_string()
