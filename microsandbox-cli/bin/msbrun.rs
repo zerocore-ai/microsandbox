@@ -256,6 +256,7 @@ async fn main() -> Result<()> {
                 log_dir.clone(),
                 rootfs.clone(),
                 forward_output,
+                num_vcpus,
             )
             .await?;
 
