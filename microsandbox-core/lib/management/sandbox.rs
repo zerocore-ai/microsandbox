@@ -445,7 +445,7 @@ pub async fn prepare_run(
 pub async fn run_temp(
     image: &Reference,
     script: Option<&str>,
-    cpus: Option<u8>,
+    cpus: Option<f32>,
     memory: Option<u32>,
     volumes: Vec<String>,
     ports: Vec<String>,
@@ -473,7 +473,7 @@ pub async fn run_temp(
         let mut b = Sandbox::builder().image(ReferenceOrPath::Reference(image.clone()));
 
         if let Some(cpus) = cpus {
-            b = b.cpus(cpus as f32);
+            b = b.cpus(cpus);
         }
 
         if let Some(memory) = memory {
