@@ -74,7 +74,7 @@ impl Image {
     pub(crate) fn get_layer_parent(&self, digest: &Digest) -> LayerDependencies {
         let parents = self
             .layers
-            .rsplit(|layer| layer.digest() == digest)
+            .split(|layer| layer.digest() == digest)
             .next()
             .map(|layer| layer.to_vec())
             .unwrap_or_default();

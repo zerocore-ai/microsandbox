@@ -240,8 +240,7 @@ async fn unpack<R: AsyncRead + Unpin>(
     let ancestors = parent.ancestors().collect::<Vec<_>>();
     for ancestor in ancestors.into_iter().rev().skip(1) {
         // To avoid directory traversal attacks, skip relative parent directories entries
-        let dir_name = ancestor.components().next();
-        if dir_name == Some(Component::ParentDir) {
+        if ancestor.components().next() == Some(Component::ParentDir) {
             tracing::debug!(ancestor = %ancestor.display(), "Skipping parent directory");
             break;
         }
@@ -253,7 +252,7 @@ async fn unpack<R: AsyncRead + Unpin>(
             )
         })?;
 
-        let dest_dir = extract_dir.join(dir_name.expect("ancestor directory should have a name"));
+        let dest_dir = extract_dir.join(ancestor);
         tracing::debug!(
             %digest,
             parent_layer_path = %parent_path.display(),
@@ -411,5 +410,232 @@ impl HardLinkVec {
         }
 
         Ok(())
+    }
+}
+
+//--------------------------------------------------------------------------------------------------
+// Tests
+//--------------------------------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::oci::{Image, LayerDependencies, LayerOps, global_cache::GlobalCacheOps};
+    use async_trait::async_trait;
+    use oci_spec::image::Digest;
+    use std::{io::Cursor, os::unix::fs::PermissionsExt, str::FromStr, sync::Arc};
+    use tempfile::TempDir;
+    use tokio::sync::{Mutex, OwnedMutexGuard};
+    use tokio_tar::Archive;
+
+    /// A minimal mock for GlobalCacheOps used by MockLayer.
+    struct MockGlobalCacheOps {
+        tar_dir: PathBuf,
+        extracted_dir: PathBuf,
+    }
+
+    #[async_trait]
+    impl GlobalCacheOps for MockGlobalCacheOps {
+        fn tar_download_dir(&self) -> &PathBuf {
+            &self.tar_dir
+        }
+
+        fn extracted_layers_dir(&self) -> &PathBuf {
+            &self.extracted_dir
+        }
+
+        async fn build_layer(&self, digest: &Digest) -> Arc<dyn LayerOps> {
+            Arc::new(MockLayer::new(digest.clone(), self.extracted_dir.clone()))
+        }
+
+        async fn all_layers_extracted(
+            &self,
+            _image: &crate::oci::Reference,
+        ) -> crate::MicrosandboxResult<bool> {
+            Ok(true)
+        }
+    }
+
+    /// A mock layer whose extracted directory is pre-populated on disk.
+    struct MockLayer {
+        digest: Digest,
+        extracted_dir: PathBuf,
+        lock: Arc<Mutex<()>>,
+        global_ops: Arc<dyn GlobalCacheOps>,
+    }
+
+    impl MockLayer {
+        fn new(digest: Digest, base_extracted_dir: PathBuf) -> Self {
+            let global_ops: Arc<dyn GlobalCacheOps> = Arc::new(MockGlobalCacheOps {
+                tar_dir: base_extracted_dir.clone(),
+                extracted_dir: base_extracted_dir,
+            });
+            Self {
+                digest,
+                extracted_dir: global_ops.extracted_layers_dir().clone(),
+                lock: Arc::new(Mutex::new(())),
+                global_ops,
+            }
+        }
+    }
+
+    #[async_trait]
+    impl LayerOps for MockLayer {
+        fn global_layer_ops(&self) -> &dyn GlobalCacheOps {
+            self.global_ops.as_ref()
+        }
+
+        fn digest(&self) -> &Digest {
+            &self.digest
+        }
+
+        async fn extracted(&self) -> crate::MicrosandboxResult<(bool, OwnedMutexGuard<()>)> {
+            let guard = self.lock.clone().lock_owned().await;
+            Ok((true, guard))
+        }
+
+        async fn cleanup_extracted(&self) -> crate::MicrosandboxResult<()> {
+            Ok(())
+        }
+
+        async fn extract(&self, _parent: LayerDependencies) -> crate::MicrosandboxResult<()> {
+            Ok(())
+        }
+
+        async fn find_dir(&self, path_in_tar: &Path) -> Option<PathBuf> {
+            let canonical_path = self.extracted_dir.join(path_in_tar);
+            if canonical_path.exists() && canonical_path.is_dir() {
+                return Some(canonical_path);
+            }
+            None
+        }
+    }
+
+    /// Build a tar archive (in memory) containing a single file at `file_path`
+    /// with `contents`, but **without** any parent directory entries.
+    fn build_tar_without_parent_dirs(file_path: &str, contents: &[u8]) -> Vec<u8> {
+        let mut builder = tar::Builder::new(Vec::new());
+        let mut header = tar::Header::new_gnu();
+        header.set_path(file_path).unwrap();
+        header.set_size(contents.len() as u64);
+        header.set_mode(0o644);
+        header.set_uid(1000);
+        header.set_gid(1000);
+        header.set_entry_type(tar::EntryType::Regular);
+        header.set_cksum();
+        builder.append(&header, contents).unwrap();
+        builder.into_inner().unwrap()
+    }
+
+    /// Test scenario:
+    ///
+    /// - Layer A (grandparent): has directories `a/`, `a/b/`, `a/b/c/`, `a/b/c/d/`
+    /// - Layer B (immediate parent): does NOT have those directories
+    /// - Layer C (current): has file `a/b/c/d/example.txt` but no directory entries
+    ///
+    /// The extraction of Layer C must skip Layer B (which lacks the dirs) and
+    /// source the ancestor directories from Layer A (the grandparent).
+    #[tokio::test]
+    async fn test_extract_layer_with_missing_deeply_nested_parents() {
+        let temp = TempDir::new().unwrap();
+        let grandparent_digest = Digest::from_str(
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        )
+        .unwrap();
+        let parent_digest = Digest::from_str(
+            "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        )
+        .unwrap();
+        let current_digest = Digest::from_str(
+            "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        )
+        .unwrap();
+
+        // Layer A (grandparent): has the deeply nested directories
+        let grandparent_extracted_dir = temp.path().join("grandparent_extracted");
+        std::fs::create_dir_all(grandparent_extracted_dir.join("a/b/c/d")).unwrap();
+
+        // Set a unique xattr and distinct permissions on each ancestor directory
+        let dir_modes: &[(&str, u32)] = &[
+            ("a", 0o755),
+            ("a/b", 0o750),
+            ("a/b/c", 0o700),
+            ("a/b/c/d", 0o751),
+        ];
+        for &(dir, mode) in dir_modes {
+            let dir_path = grandparent_extracted_dir.join(dir);
+            std::fs::set_permissions(&dir_path, std::fs::Permissions::from_mode(mode)).unwrap();
+            xattr::set(&dir_path, "user.test_marker", dir.as_bytes()).unwrap();
+        }
+
+        let mock_grandparent = MockLayer {
+            digest: grandparent_digest.clone(),
+            extracted_dir: grandparent_extracted_dir.clone(),
+            lock: Arc::new(Mutex::new(())),
+            global_ops: Arc::new(MockGlobalCacheOps {
+                tar_dir: temp.path().to_path_buf(),
+                extracted_dir: grandparent_extracted_dir.clone(),
+            }),
+        };
+
+        // Layer B (immediate parent): empty — does NOT have the directories
+        let parent_extracted_dir = temp.path().join("parent_extracted");
+        std::fs::create_dir_all(&parent_extracted_dir).unwrap();
+
+        let mock_parent = MockLayer {
+            digest: parent_digest.clone(),
+            extracted_dir: parent_extracted_dir.clone(),
+            lock: Arc::new(Mutex::new(())),
+            global_ops: Arc::new(MockGlobalCacheOps {
+                tar_dir: temp.path().to_path_buf(),
+                extracted_dir: parent_extracted_dir.clone(),
+            }),
+        };
+
+        // Build an Image with both parent layers: [grandparent, parent] (base -> top)
+        let parent_image = Image::new(vec![
+            Arc::new(mock_grandparent) as Arc<dyn LayerOps>,
+            Arc::new(mock_parent) as Arc<dyn LayerOps>,
+        ]);
+        let parent_layers = LayerDependencies::new(current_digest, parent_image);
+
+        // Build a tar with a deeply nested file but NO directory entries
+        let tar_bytes = build_tar_without_parent_dirs("a/b/c/d/example.txt", b"hello world");
+        let cursor = Cursor::new(tar_bytes);
+        let mut archive = Archive::new(cursor);
+
+        // Extract into a fresh directory (Layer C)
+        let extract_dir = temp.path().join("current_extracted");
+        std::fs::create_dir_all(&extract_dir).unwrap();
+
+        extract_tar_with_ownership_override(&mut archive, &extract_dir, parent_layers)
+            .await
+            .expect("extraction should succeed even when immediate parent lacks the dirs");
+
+        // Verify the file was extracted
+        let extracted_file = extract_dir.join("a/b/c/d/example.txt");
+        assert!(
+            extracted_file.exists(),
+            "deeply nested file should be extracted"
+        );
+        let content = std::fs::read_to_string(&extracted_file).unwrap();
+        assert_eq!(content, "hello world");
+
+        // Verify all ancestor directories were created with correct permissions and xattrs
+        for &(dir, expected_mode) in dir_modes {
+            let dir_path = extract_dir.join(dir);
+            assert!(dir_path.is_dir(), "dir '{dir}' should exist");
+
+            let actual_mode = std::fs::metadata(&dir_path).unwrap().permissions().mode() & 0o777;
+            assert_eq!(
+                actual_mode, expected_mode,
+                "permissions mismatch on '{dir}': expected {expected_mode:#o}, got {actual_mode:#o}"
+            );
+
+            let attr = xattr::get(&dir_path, "user.test_marker")
+                .expect("xattr read should not fail")
+                .unwrap_or_else(|| panic!("xattr 'user.test_marker' missing on '{dir}'"));
+            assert_eq!(attr, dir.as_bytes(), "xattr value mismatch on '{dir}'");
+        }
     }
 }
