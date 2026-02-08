@@ -16,6 +16,7 @@ use tokio_tar::{Archive, Entry};
 use crate::{MicrosandboxError, MicrosandboxResult, oci::LayerDependencies};
 
 /// Helper function to get full mode with file type bits
+#[allow(clippy::unnecessary_cast)] // libc::S_IF* types differ between platforms (u16 on macOS, u32 on Linux)
 fn get_full_mode(entry_type: &tokio_tar::EntryType, permission_bits: u32) -> u32 {
     let file_type_bits = if entry_type.is_file() {
         libc::S_IFREG as u32
