@@ -33,7 +33,7 @@
 use crate::{
     MicrosandboxResult,
     management::db::{self},
-    oci::{GlobalCache, LayerDependencies, LayerOps, Reference, Registry},
+    oci::{GlobalCache, LayerDependencies, LayerOps, Reference, Registry, resolve_registry_auth},
 };
 use futures::future;
 #[cfg(feature = "cli")]
@@ -147,7 +147,8 @@ impl Image {
         let mut platform = Platform::default();
         platform.set_os(Os::Linux);
 
-        Registry::new(db.clone(), platform, layer_cache)
+        let auth = resolve_registry_auth(&image)?;
+        Registry::new(db.clone(), platform, layer_cache, auth)
             .await?
             .pull_image(&image)
             .await
