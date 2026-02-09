@@ -8,7 +8,7 @@ use microsandbox_core::{
         config::{self, Component, ComponentType, SandboxConfig},
         home, menv, orchestra, sandbox, toolchain,
     },
-    oci::Reference,
+    oci::{Reference, normalize_registry_host},
 };
 use microsandbox_server::MicrosandboxServerResult;
 use microsandbox_utils::{
@@ -804,9 +804,11 @@ enum LoginCredentials {
 }
 
 fn resolve_registry_host(registry: Option<String>) -> String {
-    registry
+    let host = registry
         .or_else(env::get_registry_host)
-        .unwrap_or_else(env::get_oci_registry)
+        .unwrap_or_else(env::get_oci_registry);
+
+    normalize_registry_host(&host)
 }
 
 async fn resolve_login_credentials(
