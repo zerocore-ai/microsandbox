@@ -724,6 +724,7 @@ msb login ghcr.io --username user --password-stdin
 
 !!!note
 `msb login` stores credentials locally but does not validate them against the registry.
+When pulling images, environment variables take priority over stored credentials.
 !!!
 
 !!!warning Security
