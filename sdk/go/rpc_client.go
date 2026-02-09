@@ -58,9 +58,8 @@ type jsonRPCError struct {
 
 // Request parameter types
 type startParams struct {
-	Namespace string      `json:"namespace"`
-	Sandbox   string      `json:"sandbox"`
-	Config    startConfig `json:"config"`
+	Sandbox string      `json:"sandbox"`
+	Config  startConfig `json:"config"`
 }
 
 type startConfig struct {
@@ -78,27 +77,23 @@ type startConfig struct {
 }
 
 type stopParams struct {
-	Namespace string `json:"namespace"`
-	Sandbox   string `json:"sandbox"`
+	Sandbox string `json:"sandbox"`
 }
 
 type replRunParams struct {
-	Namespace string `json:"namespace"`
-	Sandbox   string `json:"sandbox"`
-	Language  string `json:"language"`
-	Code      string `json:"code"`
+	Sandbox  string `json:"sandbox"`
+	Language string `json:"language"`
+	Code     string `json:"code"`
 }
 
 type commandRunParams struct {
-	Namespace string   `json:"namespace"`
-	Sandbox   string   `json:"sandbox"`
-	Command   string   `json:"command"`
-	Args      []string `json:"args"`
-	Timeout   int      `json:"timeout,omitempty"`
+	Sandbox string   `json:"sandbox"`
+	Command string   `json:"command"`
+	Args    []string `json:"args"`
+	Timeout int      `json:"timeout,omitempty"`
 }
 
 type metricsGetParams struct {
-	Namespace   string `json:"namespace"`
 	SandboxName string `json:"sandbox"`
 }
 
@@ -113,7 +108,6 @@ type metricsResult struct {
 
 type sandboxMetrics struct {
 	Name        string  `json:"name"`
-	Namespace   string  `json:"namespace"`
 	Running     bool    `json:"running"`
 	CPUUsage    float64 `json:"cpu_usage"`
 	MemoryUsage int     `json:"memory_usage"`
@@ -209,12 +203,11 @@ func (d *jsonRPCHTTPClient) makeJSONRPCRequest(ctx context.Context, serverURL st
 
 func (d *jsonRPCHTTPClient) startSandbox(ctx context.Context, cfg *config, sc startConfig) error {
 	params := startParams{
-		Namespace: cfg.namespace,
-		Sandbox:   cfg.name,
-		Config:    sc,
+		Sandbox: cfg.name,
+		Config:  sc,
 	}
 
-	cfg.logger.Info("Starting sandbox", "name", cfg.name, "namespace", cfg.namespace, "image", sc.Image, "memory", sc.Memory, "cpus", sc.CPUs)
+	cfg.logger.Info("Starting sandbox", "name", cfg.name, "image", sc.Image, "memory", sc.Memory, "cpus", sc.CPUs)
 	_, err := d.makeJSONRPCRequest(ctx, cfg.serverUrl, methodSandboxStart, params, cfg.apiKey, cfg.logger, cfg.reqIDPrd)
 	if err == nil {
 		cfg.logger.Info("Sandbox started successfully", "name", cfg.name)
@@ -224,11 +217,10 @@ func (d *jsonRPCHTTPClient) startSandbox(ctx context.Context, cfg *config, sc st
 
 func (d *jsonRPCHTTPClient) stopSandbox(ctx context.Context, cfg *config) error {
 	params := stopParams{
-		Namespace: cfg.namespace,
-		Sandbox:   cfg.name,
+		Sandbox: cfg.name,
 	}
 
-	cfg.logger.Info("Stopping sandbox", "name", cfg.name, "namespace", cfg.namespace)
+	cfg.logger.Info("Stopping sandbox", "name", cfg.name)
 	_, err := d.makeJSONRPCRequest(ctx, cfg.serverUrl, methodSandboxStop, params, cfg.apiKey, cfg.logger, cfg.reqIDPrd)
 	if err == nil {
 		cfg.logger.Info("Sandbox stopped successfully", "name", cfg.name)
@@ -238,10 +230,9 @@ func (d *jsonRPCHTTPClient) stopSandbox(ctx context.Context, cfg *config) error 
 
 func (d *jsonRPCHTTPClient) runRepl(ctx context.Context, cfg *config, lang progLang, code string) (*executionResult, error) {
 	params := replRunParams{
-		Namespace: cfg.namespace,
-		Sandbox:   cfg.name,
-		Language:  lang.String(),
-		Code:      code,
+		Sandbox:  cfg.name,
+		Language: lang.String(),
+		Code:     code,
 	}
 
 	cfg.logger.Debug("Executing code in REPL", "sandbox", cfg.name, "language", lang.String())
@@ -255,11 +246,10 @@ func (d *jsonRPCHTTPClient) runRepl(ctx context.Context, cfg *config, lang progL
 
 func (d *jsonRPCHTTPClient) runCommand(ctx context.Context, cfg *config, command string, args []string) (*executionResult, error) {
 	params := commandRunParams{
-		Namespace: cfg.namespace,
-		Sandbox:   cfg.name,
-		Command:   command,
-		Args:      args,
-		Timeout:   int(d.Timeout),
+		Sandbox: cfg.name,
+		Command: command,
+		Args:    args,
+		Timeout: int(d.Timeout),
 	}
 
 	cfg.logger.Debug("Executing command", "sandbox", cfg.name, "command", command, "args", args)
@@ -273,7 +263,6 @@ func (d *jsonRPCHTTPClient) runCommand(ctx context.Context, cfg *config, command
 
 func (d *jsonRPCHTTPClient) getMetrics(ctx context.Context, cfg *config) (*sandboxMetrics, error) {
 	params := metricsGetParams{
-		Namespace:   cfg.namespace,
 		SandboxName: cfg.name,
 	}
 

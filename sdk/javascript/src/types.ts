@@ -12,11 +12,6 @@ export interface SandboxOptions {
   serverUrl?: string;
 
   /**
-   * Namespace for the sandbox
-   */
-  namespace?: string;
-
-  /**
    * Name for the sandbox
    */
   name?: string;
@@ -98,14 +93,6 @@ export class SandboxOptionsBuilder {
    */
   serverUrl(serverUrl: string): SandboxOptionsBuilder {
     this.options.serverUrl = serverUrl;
-    return this;
-  }
-
-  /**
-   * Set namespace
-   */
-  namespace(namespace: string): SandboxOptionsBuilder {
-    this.options.namespace = namespace;
     return this;
   }
 
@@ -230,7 +217,7 @@ export class SandboxOptionsBuilder {
 }
 
 /**
- * Namespace for SandboxOptions
+ * Module namespace for SandboxOptions
  */
 export namespace SandboxOptions {
   /**

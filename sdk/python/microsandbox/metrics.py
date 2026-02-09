@@ -45,7 +45,6 @@ class Metrics:
             "jsonrpc": "2.0",
             "method": "sandbox.metrics.get",
             "params": {
-                "namespace": self._sandbox._namespace,
                 "sandbox": self._sandbox._name,
             },
             "id": str(uuid.uuid4()),
@@ -87,7 +86,6 @@ class Metrics:
             A dictionary containing all metrics for the sandbox:
             {
                 "name": str,
-                "namespace": str,
                 "running": bool,
                 "cpu_usage": Optional[float],
                 "memory_usage": Optional[int],

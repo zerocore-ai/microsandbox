@@ -43,7 +43,6 @@ export class Metrics {
       jsonrpc: "2.0",
       method: "sandbox.metrics.get",
       params: {
-        namespace: this.sandbox.namespace,
         sandbox: this.sandbox.name,
       },
       id: uuidv4(),
@@ -65,7 +64,7 @@ export class Metrics {
 
       if ("error" in responseData) {
         throw new Error(
-          `Failed to get sandbox metrics: ${responseData.error.message}`
+          `Failed to get sandbox metrics: ${responseData.error.message}`,
         );
       }
 
@@ -93,7 +92,6 @@ export class Metrics {
    * @returns A dictionary containing all metrics for the sandbox:
    * {
    *   "name": string,
-   *   "namespace": string,
    *   "running": boolean,
    *   "cpu_usage": number | null,
    *   "memory_usage": number | null,

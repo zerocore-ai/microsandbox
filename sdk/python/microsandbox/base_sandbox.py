@@ -27,7 +27,6 @@ class BaseSandbox(ABC):
     def __init__(
         self,
         server_url: str = None,
-        namespace: str = "default",
         name: Optional[str] = None,
         api_key: Optional[str] = None,
     ):
@@ -36,7 +35,6 @@ class BaseSandbox(ABC):
 
         Args:
             server_url: URL of the Microsandbox server. If not provided, will check MSB_SERVER_URL environment variable, then fall back to default.
-            namespace: Namespace for the sandbox
             name: Optional name for the sandbox. If not provided, a random name will be generated.
             api_key: API key for Microsandbox server authentication. If not provided, it will be read from MSB_API_KEY environment variable.
         """
@@ -51,7 +49,6 @@ class BaseSandbox(ABC):
         self._server_url = server_url or os.environ.get(
             "MSB_SERVER_URL", "http://127.0.0.1:5555"
         )
-        self._namespace = namespace
         self._name = name or f"sandbox-{uuid.uuid4().hex[:8]}"
         self._api_key = api_key or os.environ.get("MSB_API_KEY")
         self._session = None
@@ -72,7 +69,6 @@ class BaseSandbox(ABC):
     async def create(
         cls,
         server_url: str = None,
-        namespace: str = "default",
         name: Optional[str] = None,
         api_key: Optional[str] = None,
     ):
@@ -81,7 +77,6 @@ class BaseSandbox(ABC):
 
         Args:
             server_url: URL of the Microsandbox server. If not provided, will check MSB_SERVER_URL environment variable, then fall back to default.
-            namespace: Namespace for the sandbox
             name: Optional name for the sandbox. If not provided, a random name will be generated.
             api_key: API key for Microsandbox server authentication. If not provided, it will be read from MSB_API_KEY environment variable.
 
@@ -98,7 +93,6 @@ class BaseSandbox(ABC):
 
         sandbox = cls(
             server_url=server_url,
-            namespace=namespace,
             name=name,
             api_key=api_key,
         )
@@ -182,11 +176,9 @@ class BaseSandbox(ABC):
             "jsonrpc": "2.0",
             "method": "sandbox.start",
             "params": {
-                "namespace": self._namespace,
                 "sandbox": self._name,
                 "config": config,
             },
-            "id": str(uuid.uuid4()),
         }
 
         headers = {"Content-Type": "application/json"}
@@ -199,7 +191,7 @@ class BaseSandbox(ABC):
             client_timeout = aiohttp.ClientTimeout(total=timeout + 30)
 
             async with self._session.post(
-                f"{self._server_url}/api/v1/rpc",
+                f"{self._server_url}/api/v1/sandbox/start",
                 json=request_data,
                 headers=headers,
                 timeout=client_timeout,
@@ -209,19 +201,15 @@ class BaseSandbox(ABC):
                     raise RuntimeError(f"Failed to start sandbox: {error_text}")
 
                 response_data = await response.json()
-                if "error" in response_data:
-                    raise RuntimeError(
-                        f"Failed to start sandbox: {response_data['error']['message']}"
-                    )
 
-                # Check the result message - it might indicate the sandbox is still initializing
-                result = response_data.get("result", "")
-                if isinstance(result, str) and "timed out waiting" in result:
+                # Check the message - it might indicate the sandbox is still initializing
+                message = response_data.get("message", "")
+                if isinstance(message, str) and "timed out waiting" in message:
                     # Server timed out but still started the sandbox
                     # We'll raise a warning but still consider it started
                     import warnings
 
-                    warnings.warn(f"Sandbox start warning: {result}")
+                    warnings.warn(f"Sandbox start warning: {message}")
 
                 self._is_started = True
         except aiohttp.ClientError as e:
@@ -244,7 +232,7 @@ class BaseSandbox(ABC):
         request_data = {
             "jsonrpc": "2.0",
             "method": "sandbox.stop",
-            "params": {"namespace": self._namespace, "sandbox": self._name},
+            "params": {"sandbox": self._name},
             "id": str(uuid.uuid4()),
         }
 
@@ -254,19 +242,13 @@ class BaseSandbox(ABC):
 
         try:
             async with self._session.post(
-                f"{self._server_url}/api/v1/rpc",
+                f"{self._server_url}/api/v1/sandbox/stop",
                 json=request_data,
                 headers=headers,
             ) as response:
                 if response.status != 200:
                     error_text = await response.text()
                     raise RuntimeError(f"Failed to stop sandbox: {error_text}")
-
-                response_data = await response.json()
-                if "error" in response_data:
-                    raise RuntimeError(
-                        f"Failed to stop sandbox: {response_data['error']['message']}"
-                    )
 
                 self._is_started = False
         except aiohttp.ClientError as e:

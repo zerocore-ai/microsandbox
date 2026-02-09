@@ -585,17 +585,17 @@ async fn setup_image_rootfs(
         layer_paths.push(layer_path);
     }
 
-    // Get sandbox namespace
-    let namespaced_name = PathBuf::from(config_file).join(sandbox_name);
+    // Get sandbox scoped name (config_file/sandbox_name)
+    let scoped_name = PathBuf::from(config_file).join(sandbox_name);
 
     // Create the scripts directory
-    let patch_dir = menv_path.join(PATCH_SUBDIR).join(&namespaced_name);
+    let patch_dir = menv_path.join(PATCH_SUBDIR).join(&scoped_name);
     let script_dir = patch_dir.join(SANDBOX_DIR).join(SCRIPTS_DIR);
     fs::create_dir_all(&script_dir).await?;
     tracing::info!("script_dir: {}", script_dir.display());
 
     // Create the top root path
-    let top_rw_path = menv_path.join(RW_SUBDIR).join(&namespaced_name);
+    let top_rw_path = menv_path.join(RW_SUBDIR).join(&scoped_name);
     fs::create_dir_all(&top_rw_path).await?;
     tracing::info!("top_rw_path: {}", top_rw_path.display());
 

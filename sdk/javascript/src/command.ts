@@ -32,7 +32,7 @@ export class Command {
   async run(
     command: string,
     args?: string[],
-    timeout?: number
+    timeout?: number,
   ): Promise<CommandExecution> {
     if (!this.sandbox.isStarted) {
       throw new Error("Sandbox is not started. Call start() first.");
@@ -52,7 +52,6 @@ export class Command {
       method: string;
       params: {
         sandbox: string;
-        namespace: string;
         command: string;
         args: string[];
         timeout?: number;
@@ -63,7 +62,6 @@ export class Command {
       method: "sandbox.command.run",
       params: {
         sandbox: this.sandbox.name,
-        namespace: this.sandbox.namespace,
         command,
         args: args || [],
       },
@@ -76,11 +74,14 @@ export class Command {
     }
 
     try {
-      const response = await fetch(`${this.sandbox.serverUrl}/api/v1/rpc`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(requestData),
-      });
+      const response = await fetch(
+        `${this.sandbox.serverUrl}/api/v1/sandbox/command/run`,
+        {
+          method: "POST",
+          headers,
+          body: JSON.stringify(requestData),
+        },
+      );
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -91,7 +92,7 @@ export class Command {
 
       if ("error" in responseData) {
         throw new Error(
-          `Failed to execute command: ${responseData.error.message}`
+          `Failed to execute command: ${responseData.error.message}`,
         );
       }
 

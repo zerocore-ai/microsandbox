@@ -49,7 +49,6 @@ class PythonSandbox(BaseSandbox):
             "method": "sandbox.repl.run",
             "params": {
                 "sandbox": self._name,
-                "namespace": self._namespace,
                 "language": "python",
                 "code": code,
             },

@@ -37,8 +37,4 @@ pub enum MicrosandboxCliError {
     /// Configuration error
     #[error("configuration error: {0}")]
     ConfigError(String),
-
-    /// Namespace operation error
-    #[error("namespace error: {0}")]
-    NamespaceError(String),
 }

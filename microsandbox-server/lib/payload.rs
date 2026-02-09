@@ -122,9 +122,6 @@ pub struct SandboxStartParams {
     /// Sandbox name
     pub sandbox: String,
 
-    /// Optional namespace
-    pub namespace: String,
-
     /// Optional sandbox configuration
     pub config: Option<SandboxConfig>,
 }
@@ -134,19 +131,13 @@ pub struct SandboxStartParams {
 pub struct SandboxStopParams {
     /// Sandbox name
     pub sandbox: String,
-
-    /// Optional namespace
-    pub namespace: String,
 }
 
 /// Request payload for getting sandbox metrics
 #[derive(Debug, Deserialize)]
 pub struct SandboxMetricsGetParams {
-    /// Optional sandbox name - if not provided, all sandboxes in the namespace will be included
+    /// Optional sandbox name - if not provided, all sandboxes will be included
     pub sandbox: Option<String>,
-
-    /// Namespace - use "*" to get metrics from all namespaces
-    pub namespace: String,
 }
 
 /// Configuration for a sandbox
@@ -202,6 +193,9 @@ pub struct SandboxConfig {
 /// Request parameters for executing code in a REPL environment
 #[derive(Debug, Deserialize, Serialize)]
 pub struct SandboxReplRunParams {
+    /// Sandbox name
+    pub sandbox: String,
+
     /// Code to be executed
     pub code: String,
 
@@ -219,12 +213,18 @@ pub struct SandboxReplGetOutputParams {
 /// Request parameters for executing a shell command
 #[derive(Debug, Deserialize, Serialize)]
 pub struct SandboxCommandRunParams {
+    /// Sandbox name
+    pub sandbox: String,
+
     /// Command to execute
     pub command: String,
 
     /// Optional arguments for the command
     #[serde(default)]
     pub args: Vec<String>,
+
+    /// Optional timeout in seconds
+    pub timeout: Option<i32>,
 }
 
 /// Request parameters for retrieving output from a previous command execution
@@ -350,9 +350,6 @@ pub struct SandboxConfigResponse {}
 /// Status of an individual sandbox
 #[derive(Debug, Serialize)]
 pub struct SandboxStatus {
-    /// Namespace the sandbox belongs to
-    pub namespace: String,
-
     /// The name of the sandbox
     pub name: String,
 

@@ -1,14 +1,11 @@
 //! Command execution interface for sandboxes
 
 use serde_json::Value;
-use std::collections::HashMap;
-use std::error::Error;
-use std::sync::Arc;
+use std::{collections::HashMap, error::Error, sync::Arc};
 
 use tokio::sync::Mutex;
 
-use crate::SandboxBase;
-use crate::SandboxError;
+use crate::{SandboxBase, SandboxError};
 
 /// Result of a command execution in a sandbox
 #[derive(Debug, Clone)]
@@ -195,16 +192,15 @@ impl Command {
             .map(|&s| s.to_string())
             .collect::<Vec<_>>();
 
-        // Get the sandbox name and namespace
-        let (name, namespace) = {
+        // Get the sandbox name
+        let name = {
             let base = self.sandbox.lock().await;
-            (base.name.clone(), base.namespace.clone())
+            base.name.clone()
         };
 
         // Build parameters
         let mut params = serde_json::json!({
             "sandbox": name,
-            "namespace": namespace,
             "command": command,
             "args": args_vec,
         });

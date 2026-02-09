@@ -108,7 +108,7 @@ func allMetricsExample() {
 	}
 
 	// Print formatted metrics
-	fmt.Printf("Sandbox: %s (namespace: %s)\n", allMetrics.Name, allMetrics.Namespace)
+	fmt.Printf("Sandbox: %s\n", allMetrics.Name)
 	fmt.Printf("  Running: %t\n", allMetrics.IsRunning)
 	fmt.Printf("  CPU Usage: %.2f%%\n", allMetrics.CPU)
 	fmt.Printf("  Memory Usage: %d MiB\n", allMetrics.MemoryMiB)

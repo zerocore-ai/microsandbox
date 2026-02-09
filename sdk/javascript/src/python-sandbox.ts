@@ -45,7 +45,6 @@ export class PythonSandbox extends BaseSandbox {
       method: string;
       params: {
         sandbox: string;
-        namespace: string;
         language: string;
         code: string;
         timeout?: number;
@@ -56,7 +55,6 @@ export class PythonSandbox extends BaseSandbox {
       method: "sandbox.repl.run",
       params: {
         sandbox: this._name,
-        namespace: this._namespace,
         language: "python",
         code,
       },
@@ -84,7 +82,7 @@ export class PythonSandbox extends BaseSandbox {
 
       if ("error" in responseData) {
         throw new Error(
-          `Failed to execute code: ${responseData.error.message}`
+          `Failed to execute code: ${responseData.error.message}`,
         );
       }
 

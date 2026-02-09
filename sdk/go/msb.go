@@ -91,7 +91,6 @@ type (
 	// Metrics contains resource usage information for a sandbox.
 	Metrics struct {
 		Name      string  // Sandbox name
-		Namespace string  // Sandbox namespace
 		IsRunning bool    // Whether the sandbox is currently running
 		CPU       float64 // CPU usage percentage (0-100)
 		MemoryMiB int     // Memory usage in mebibytes
@@ -232,7 +231,6 @@ func (mr metricsReader) All() (Metrics, error) {
 
 	return Metrics{
 		Name:      metrics.Name,
-		Namespace: metrics.Namespace,
 		IsRunning: metrics.Running,
 		CPU:       metrics.CPUUsage,
 		MemoryMiB: metrics.MemoryUsage,

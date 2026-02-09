@@ -158,11 +158,7 @@ pub async fn apply(
 
     // Ensure menv files exist
     let menv_path = canonical_project_dir.join(MICROSANDBOX_ENV_DIR);
-    if let Err(e) = menv::ensure_menv_files(&menv_path).await {
-        #[cfg(feature = "cli")]
-        term::finish_with_error(&apply_config_sp);
-        return Err(e);
-    }
+    menv::ensure_menv_files(&menv_path).await?;
 
     // Get database connection pool
     let db_path = menv_path.join(SANDBOX_DB_FILENAME);
@@ -202,7 +198,7 @@ pub async fn apply(
         // Start sandboxes in detached mode
         for name in sandboxes_to_start {
             tracing::info!("starting sandbox: {}", name);
-            if let Err(e) = sandbox::run(
+            sandbox::run(
                 name,
                 Some(START_SCRIPT_NAME),
                 Some(&canonical_project_dir),
@@ -212,12 +208,7 @@ pub async fn apply(
                 None,
                 true,
             )
-            .await
-            {
-                #[cfg(feature = "cli")]
-                term::finish_with_error(&apply_config_sp);
-                return Err(e);
-            }
+            .await?
         }
     } else {
         // Start sandboxes in non-detached mode with multiplexed output
@@ -341,27 +332,19 @@ pub async fn up(
         config_sandboxes.keys().cloned().collect()
     } else {
         // Validate all sandbox names exist in config before proceeding
-        if let Err(e) = validate_sandbox_names(
+        validate_sandbox_names(
             &sandbox_names,
             &config,
             &canonical_project_dir,
             &config_file,
-        ) {
-            #[cfg(feature = "cli")]
-            term::finish_with_error(&start_sandboxes_sp);
-            return Err(e);
-        }
+        )?;
 
         sandbox_names
     };
 
     // Ensure menv files exist
     let menv_path = canonical_project_dir.join(MICROSANDBOX_ENV_DIR);
-    if let Err(e) = menv::ensure_menv_files(&menv_path).await {
-        #[cfg(feature = "cli")]
-        term::finish_with_error(&start_sandboxes_sp);
-        return Err(e);
-    }
+    menv::ensure_menv_files(&menv_path).await?;
 
     // Get database connection pool
     let db_path = menv_path.join(SANDBOX_DB_FILENAME);
@@ -405,7 +388,7 @@ pub async fn up(
         // Start specified sandboxes in detached mode
         for name in sandboxes_to_start {
             tracing::info!("starting sandbox: {}", name);
-            if let Err(e) = sandbox::run(
+            sandbox::run(
                 name,
                 None,
                 Some(&canonical_project_dir),
@@ -415,12 +398,7 @@ pub async fn up(
                 None,
                 true,
             )
-            .await
-            {
-                #[cfg(feature = "cli")]
-                term::finish_with_error(&start_sandboxes_sp);
-                return Err(e);
-            }
+            .await?
         }
     } else {
         // Start sandboxes in non-detached mode with multiplexed output
@@ -526,27 +504,19 @@ pub async fn down(
         config_sandboxes.keys().cloned().collect()
     } else {
         // Validate all sandbox names exist in config before proceeding
-        if let Err(e) = validate_sandbox_names(
+        validate_sandbox_names(
             &sandbox_names,
             &config,
             &canonical_project_dir,
             &config_file,
-        ) {
-            #[cfg(feature = "cli")]
-            term::finish_with_error(&stop_sandboxes_sp);
-            return Err(e);
-        }
+        )?;
 
         sandbox_names
     };
 
     // Ensure menv files exist
     let menv_path = canonical_project_dir.join(MICROSANDBOX_ENV_DIR);
-    if let Err(e) = menv::ensure_menv_files(&menv_path).await {
-        #[cfg(feature = "cli")]
-        term::finish_with_error(&stop_sandboxes_sp);
-        return Err(e);
-    }
+    menv::ensure_menv_files(&menv_path).await?;
 
     // Get database connection pool
     let db_path = menv_path.join(SANDBOX_DB_FILENAME);
@@ -837,15 +807,15 @@ pub async fn show_status(
     Ok(())
 }
 
-/// Show status of sandboxes across multiple namespaces
+/// Show status of sandboxes across multiple projects
 ///
-/// This function displays the status of sandboxes from multiple namespaces in a consolidated view.
-/// It's useful for server mode when you want to see all sandboxes across all namespaces.
+/// This function displays the status of sandboxes from multiple projects in a consolidated view.
+/// It's useful for server mode when you want to see all sandboxes across all projects.
 ///
 /// ## Arguments
 ///
 /// * `names` - List of sandbox names to show status for. If empty, shows all sandboxes.
-/// * `namespaces_parent_dir` - The parent directory containing namespace directories
+/// * `projects_parent_dir` - The parent directory containing project directories
 ///
 /// ## Returns
 ///
@@ -862,25 +832,25 @@ pub async fn show_status(
 ///
 /// #[tokio::main]
 /// async fn main() -> anyhow::Result<()> {
-///     // Parent directory containing all namespace subdirectories
-///     let namespaces_parent = Path::new("/path/to/namespaces");
+///     // Parent directory containing all project subdirectories
+///     let projects_parent = Path::new("/path/to/projects");
 ///
-///     // Show status for all sandboxes in all namespaces
-///     orchestra::show_status_namespaces(&[], namespaces_parent).await?;
+///     // Show status for all sandboxes in all projects
+///     orchestra::show_status_projects(&[], projects_parent).await?;
 ///
 ///     // Or show status for specific sandboxes
-///     orchestra::show_status_namespaces(
+///     orchestra::show_status_projects(
 ///         &["sandbox1".to_string(), "sandbox2".to_string()],
-///         namespaces_parent
+///         projects_parent
 ///     ).await?;
 ///
 ///     Ok(())
 /// }
 /// ```
 #[cfg(feature = "cli")]
-pub async fn show_status_namespaces(
+pub async fn show_status_projects(
     names: &[String],
-    namespaces_parent_dir: &Path,
+    projects_parent_dir: &Path,
 ) -> MicrosandboxResult<()> {
     // Check if we're in a TTY to determine if we should do live updates
     let is_tty = io::stdin().is_terminal();
@@ -894,7 +864,7 @@ pub async fn show_status_namespaces(
             // Clear the screen by printing ANSI escape code
             print!("\x1B[2J\x1B[1;1H");
 
-            display_status_namespaces(names, namespaces_parent_dir).await?;
+            display_status_projects(names, projects_parent_dir).await?;
 
             // Show update message
             println!(
@@ -907,7 +877,7 @@ pub async fn show_status_namespaces(
         }
     } else {
         // Just display once for non-TTY
-        display_status_namespaces(names, namespaces_parent_dir).await?;
+        display_status_projects(names, projects_parent_dir).await?;
     }
 
     Ok(())
@@ -1237,87 +1207,87 @@ async fn display_status(
     Ok(())
 }
 
-// Update display_status_namespaces to discover namespaces dynamically
+// Display status of sandboxes across multiple projects
 #[cfg(feature = "cli")]
-async fn display_status_namespaces(
+async fn display_status_projects(
     names: &[String],
-    namespaces_parent_dir: &Path,
+    projects_parent_dir: &Path,
 ) -> MicrosandboxResult<()> {
-    // Create a struct to hold status with namespace info
+    // Create a struct to hold status with project info
     #[derive(Clone)]
-    struct NamespacedStatus {
-        namespace: String,
+    struct ProjectStatus {
+        project: String,
         status: SandboxStatus,
     }
 
-    // Collect statuses from all namespaces
+    // Collect statuses from all projects
     let mut all_statuses = Vec::new();
-    let mut namespace_count = 0;
+    let mut project_count = 0;
 
     // Check if the parent directory exists
-    if !namespaces_parent_dir.exists() {
+    if !projects_parent_dir.exists() {
         return Err(MicrosandboxError::PathNotFound(format!(
-            "Namespaces directory not found at {}",
-            namespaces_parent_dir.display()
+            "Projects directory not found at {}",
+            projects_parent_dir.display()
         )));
     }
 
-    // Scan the parent directory for namespaces
-    let mut entries = tokio::fs::read_dir(namespaces_parent_dir).await?;
-    let mut namespace_dirs = Vec::new();
+    // Scan the parent directory for projects
+    let mut entries = tokio::fs::read_dir(projects_parent_dir).await?;
+    let mut project_dirs = Vec::new();
 
     while let Some(entry) = entries.next_entry().await? {
         let path = entry.path();
         if path.is_dir() {
-            namespace_dirs.push(path);
+            project_dirs.push(path);
         }
     }
 
-    // Sort namespace dirs alphabetically (initial sort to ensure deterministic behavior)
-    namespace_dirs.sort_by(|a, b| {
+    // Sort project dirs alphabetically (initial sort to ensure deterministic behavior)
+    project_dirs.sort_by(|a, b| {
         let a_name = a.file_name().and_then(|n| n.to_str()).unwrap_or("");
         let b_name = b.file_name().and_then(|n| n.to_str()).unwrap_or("");
         a_name.cmp(b_name)
     });
 
-    // Process each namespace directory
-    for namespace_dir in &namespace_dirs {
-        // Extract namespace name from path
-        let namespace = namespace_dir
+    // Process each project directory
+    for project_dir in &project_dirs {
+        // Extract project name from path
+        let project = project_dir
             .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or("unknown")
             .to_string();
 
-        namespace_count += 1;
+        project_count += 1;
 
-        // Get statuses for this namespace
-        match status(names.to_vec(), Some(namespace_dir), None).await {
+        // Get statuses for this project
+        match status(names.to_vec(), Some(project_dir), None).await {
             Ok(statuses) => {
-                // Add namespace info to each status
+                // Add project info to each status
                 for status in statuses {
-                    all_statuses.push(NamespacedStatus {
-                        namespace: namespace.clone(),
+                    all_statuses.push(ProjectStatus {
+                        project: project.clone(),
                         status,
                     });
                 }
             }
             Err(e) => {
-                // Log error but continue with other namespaces
-                tracing::warn!("Error getting status for namespace {}: {}", namespace, e);
+                // Log error but continue with other projects
+                tracing::warn!("Error getting status for project {}: {}", project, e);
             }
         }
     }
 
-    // Group the statuses by namespace
-    let mut statuses_by_namespace: std::collections::HashMap<String, Vec<SandboxStatus>> =
+    // Group the statuses by project
+    let mut statuses_by_project: std::collections::HashMap<String, Vec<SandboxStatus>> =
         std::collections::HashMap::new();
 
-    for namespaced_status in all_statuses {
-        statuses_by_namespace
-            .entry(namespaced_status.namespace)
+    for project_status in all_statuses {
+        statuses_by_project
+            .entry(project_status.project)
             .or_default()
-            .push(namespaced_status.status);
+            .push(project_status.status);
     }
 
     // Get current timestamp
@@ -1327,9 +1297,9 @@ async fn display_status_namespaces(
     // Display timestamp
     println!("{}", style(format!("Last updated: {}", timestamp)).dim());
 
-    // Prepare namespaces with their activity metrics for sorting
+    // Prepare projects with their activity metrics for sorting
     #[derive(Clone)]
-    struct NamespaceActivity {
+    struct ProjectActivity {
         name: String,
         running_count: usize,
         total_cpu: f32,
@@ -1337,10 +1307,10 @@ async fn display_status_namespaces(
         statuses: Vec<SandboxStatus>,
     }
 
-    let mut namespace_activities = Vec::new();
+    let mut project_activities = Vec::new();
 
-    // Calculate activity metrics for each namespace
-    for (namespace, statuses) in statuses_by_namespace {
+    // Calculate activity metrics for each project
+    for (project, statuses) in statuses_by_project {
         if statuses.is_empty() {
             continue;
         }
@@ -1349,8 +1319,8 @@ async fn display_status_namespaces(
         let total_cpu: f32 = statuses.iter().filter_map(|s| s.cpu_usage).sum();
         let total_memory: u64 = statuses.iter().filter_map(|s| s.memory_usage).sum();
 
-        namespace_activities.push(NamespaceActivity {
-            name: namespace,
+        project_activities.push(ProjectActivity {
+            name: project,
             running_count,
             total_cpu,
             total_memory,
@@ -1358,8 +1328,8 @@ async fn display_status_namespaces(
         });
     }
 
-    // Sort namespaces by activity level (running count first, then resource usage)
-    namespace_activities.sort_by(|a, b| {
+    // Sort projects by activity level (running count first, then resource usage)
+    project_activities.sort_by(|a, b| {
         // First by number of running sandboxes (descending)
         let running_order = b.running_count.cmp(&a.running_count);
         if running_order != std::cmp::Ordering::Equal {
@@ -1389,16 +1359,16 @@ async fn display_status_namespaces(
     let mut total_sandboxes = 0;
     let mut is_first = true;
 
-    // Display namespaces and their statuses with headers
-    for activity in namespace_activities {
-        // Add spacing between namespaces
+    // Display projects and their statuses with headers
+    for activity in project_activities {
+        // Add spacing between projects
         if !is_first {
             println!();
         }
         is_first = false;
 
-        // Print namespace header
-        print_namespace_header(&activity.name);
+        // Print project header
+        print_project_header(&activity.name);
 
         // Sort the statuses in a stable order
         let mut statuses = activity.statuses;
@@ -1442,7 +1412,7 @@ async fn display_status_namespaces(
 
         total_sandboxes += statuses.len();
 
-        // Print a table header for this namespace's sandboxes
+        // Print a table header for this project's sandboxes
         println!(
             "{:<15} {:<10} {:<15} {:<12} {:<12} {:<12}",
             style("SANDBOX").bold(),
@@ -1455,7 +1425,7 @@ async fn display_status_namespaces(
 
         println!("{}", style("─".repeat(80)).dim());
 
-        // Display the statuses for this namespace
+        // Display the statuses for this project
         for status in statuses {
             let (status_text, pids, cpu, memory, disk) = format_status_columns(&status);
 
@@ -1474,8 +1444,8 @@ async fn display_status_namespaces(
     // Show summary with the captured counts
     println!(
         "\n{}: {}, {}: {}",
-        style("Total Namespaces").dim(),
-        namespace_count,
+        style("Total Projects").dim(),
+        project_count,
         style("Total Sandboxes").dim(),
         total_sandboxes
     );
@@ -1483,11 +1453,11 @@ async fn display_status_namespaces(
     Ok(())
 }
 
-/// Prints a stylized header for namespace display
+/// Prints a stylized header for project display
 #[cfg(feature = "cli")]
-fn print_namespace_header(namespace: &str) {
+fn print_project_header(project: &str) {
     // Create the simple title text without padding
-    let title = format!("NAMESPACE: {}", namespace);
+    let title = format!("PROJECT: {}", project);
 
     // Print the title with white color and underline styling
     println!("\n{}", style(title).white().bold());

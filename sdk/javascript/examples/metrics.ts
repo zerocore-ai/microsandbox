@@ -59,7 +59,7 @@ async function basicMetricsExample() {
       console.log(`Is Running: ${running}`);
     } catch (e) {
       console.log(
-        `Error getting metrics: ${e instanceof Error ? e.message : e}`
+        `Error getting metrics: ${e instanceof Error ? e.message : e}`,
       );
     }
   } finally {
@@ -92,9 +92,7 @@ async function allMetricsExample() {
     const allMetrics = await sandbox.metrics.all();
 
     // Print formatted metrics
-    console.log(
-      `Sandbox: ${allMetrics.name} (namespace: ${allMetrics.namespace})`
-    );
+    console.log(`Sandbox: ${allMetrics.name}`);
     console.log(`  Running: ${allMetrics.running}`);
 
     // Handle CPU metrics which may be 0.0 or undefined
@@ -106,14 +104,14 @@ async function allMetricsExample() {
     }
 
     console.log(
-      `  Memory Usage: ${allMetrics.memory_usage || "Not available"} MiB`
+      `  Memory Usage: ${allMetrics.memory_usage || "Not available"} MiB`,
     );
     console.log(
-      `  Disk Usage: ${allMetrics.disk_usage || "Not available"} bytes`
+      `  Disk Usage: ${allMetrics.disk_usage || "Not available"} bytes`,
     );
   } catch (e) {
     console.log(
-      `Error in allMetricsExample: ${e instanceof Error ? e.message : e}`
+      `Error in allMetricsExample: ${e instanceof Error ? e.message : e}`,
     );
   } finally {
     await sandbox.stop();
@@ -151,12 +149,12 @@ async function continuousMonitoringExample() {
         // Print current values
         console.log(
           `[${((Date.now() - startTime) / 1000).toFixed(
-            1
-          )}s] CPU: ${cpuStr}, Memory: ${memory || "Not available"} MiB`
+            1,
+          )}s] CPU: ${cpuStr}, Memory: ${memory || "Not available"} MiB`,
         );
       } catch (e) {
         console.log(
-          `Error getting metrics: ${e instanceof Error ? e.message : e}`
+          `Error getting metrics: ${e instanceof Error ? e.message : e}`,
         );
       }
 
@@ -169,7 +167,7 @@ async function continuousMonitoringExample() {
     console.log(
       `Error in continuousMonitoringExample: ${
         e instanceof Error ? e.message : e
-      }`
+      }`,
     );
   } finally {
     await sandbox.stop();
@@ -180,7 +178,6 @@ async function continuousMonitoringExample() {
  * Example generating CPU load to test CPU metrics.
  */
 async function cpuLoadTestExample() {
-
   console.log("\n=== CPU Load Test Example ===");
 
   // Create a sandbox
@@ -240,14 +237,14 @@ print("CPU load test complete")
       console.log(
         `[${i * 2} seconds] CPU: ${cpuStr}, Memory: ${
           memory || "Not available"
-        } MiB`
+        } MiB`,
       );
     }
 
     console.log("CPU load test complete.");
   } catch (e) {
     console.log(
-      `Error in cpuLoadTestExample: ${e instanceof Error ? e.message : e}`
+      `Error in cpuLoadTestExample: ${e instanceof Error ? e.message : e}`,
     );
   } finally {
     await sandbox.stop();
@@ -307,7 +304,7 @@ async function main() {
     console.log("\nAll metrics examples completed!");
   } catch (e) {
     console.error(
-      `Error running examples: ${e instanceof Error ? e.message : e}`
+      `Error running examples: ${e instanceof Error ? e.message : e}`,
     );
   }
 }

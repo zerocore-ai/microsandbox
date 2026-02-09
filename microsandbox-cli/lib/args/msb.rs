@@ -568,9 +568,9 @@ pub enum ServerSubcommand {
         #[arg(long)]
         port: Option<u16>,
 
-        /// Path to the namespace directory
+        /// Project directory for storing sandbox configurations and state
         #[arg(short = 'p', long = "path")]
-        namespace_dir: Option<PathBuf>,
+        project_dir: Option<PathBuf>,
 
         /// Run server in development mode
         #[arg(long = "dev")]
@@ -598,10 +598,6 @@ pub enum ServerSubcommand {
         /// Token expiration duration. format: 1s, 2m, 3h, 4d, 5w, 6mo, 7y
         #[arg(long)]
         expire: Option<String>,
-
-        /// Namespace for the API key. If not specified, generates a key for all namespaces.
-        #[arg(short, long)]
-        namespace: Option<String>,
     },
 
     /// Show logs of a sandbox
@@ -615,10 +611,6 @@ pub enum ServerSubcommand {
         #[arg(required = true)]
         name: String,
 
-        /// Namespace for the logs
-        #[arg(short, long)]
-        namespace: String,
-
         /// Follow the logs
         #[arg(short, long)]
         follow: bool,
@@ -628,13 +620,9 @@ pub enum ServerSubcommand {
         tail: Option<usize>,
     },
 
-    /// List sandboxes in a namespace
+    /// List sandboxes
     #[command(name = "list")]
-    List {
-        /// Namespace to list sandboxes from. If not provided, lists sandboxes from all namespaces.
-        #[arg(short, long)]
-        namespace: Option<String>,
-    },
+    List,
 
     /// Show server status
     #[command(name = "status")]
@@ -646,19 +634,11 @@ pub enum ServerSubcommand {
         /// Name of the component
         #[arg()]
         names: Vec<String>,
-
-        /// Namespace to show status for. If not provided, shows status for all namespaces.
-        #[arg(short, long)]
-        namespace: Option<String>,
     },
 
     /// SSH into a sandbox
     #[command(name = "ssh")]
     Ssh {
-        /// Namespace for the SSH key
-        #[arg(short, long, required = true)]
-        namespace: String,
-
         /// Whether to SSH into a sandbox
         #[arg(short, long)]
         sandbox: bool,

@@ -25,9 +25,9 @@ pub struct MsbserverArgs {
     #[arg(long, default_value_t = DEFAULT_SERVER_PORT)]
     pub port: u16,
 
-    /// Directory for storing namespaces
+    /// Project directory for storing sandbox configurations and state
     #[arg(short = 'p', long = "path")]
-    pub namespace_dir: Option<PathBuf>,
+    pub project_dir: Option<PathBuf>,
 
     /// Run in development mode
     #[arg(long = "dev", default_value_t = false)]

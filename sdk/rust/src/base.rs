@@ -13,9 +13,6 @@ pub struct SandboxBase {
     /// URL of the Microsandbox server
     pub(crate) server_url: String,
 
-    /// Namespace for the sandbox
-    pub(crate) namespace: String,
-
     /// Name of the sandbox
     pub(crate) name: String,
 
@@ -61,10 +58,6 @@ impl SandboxBase {
 
         Self {
             server_url,
-            namespace: options
-                .namespace
-                .clone()
-                .unwrap_or_else(|| "default".to_string()),
             name,
             api_key,
             client: reqwest::Client::new(),
@@ -174,7 +167,6 @@ impl SandboxBase {
         }
 
         let params = json!({
-            "namespace": self.namespace,
             "sandbox": self.name,
             "config": config,
         });
@@ -258,7 +250,6 @@ impl SandboxBase {
         }
 
         let params = json!({
-            "namespace": self.namespace,
             "sandbox": self.name,
         });
 
@@ -280,7 +271,6 @@ impl SandboxBase {
 
         let params = json!({
             "sandbox": self.name,
-            "namespace": self.namespace,
             "language": language,
             "code": code,
         });

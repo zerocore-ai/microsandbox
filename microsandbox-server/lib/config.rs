@@ -3,14 +3,14 @@
 //! This module handles server configuration including:
 //! - Server settings and environment variables
 //! - JWT token configuration
-//! - Namespace management
+//! - Project directory management
 //! - Development and production mode settings
 //!
 //! The module provides:
 //! - Configuration structure for server settings
 //! - Default values for server configuration
 //! - Environment-based configuration loading
-//! - Namespace directory management
+//! - Project directory management
 
 use std::{
     net::{IpAddr, SocketAddr},
@@ -18,7 +18,7 @@ use std::{
 };
 
 use getset::Getters;
-use microsandbox_utils::{NAMESPACES_SUBDIR, env};
+use microsandbox_utils::{PROJECTS_SUBDIR, env};
 use serde::Deserialize;
 
 use crate::{MicrosandboxServerError, MicrosandboxServerResult};
@@ -42,8 +42,8 @@ pub struct Config {
     /// Secret key used for JWT token generation and validation
     key: Option<String>,
 
-    /// Directory for storing namespaces
-    namespace_dir: PathBuf,
+    /// Project directory for storing sandbox configurations and state
+    project_dir: PathBuf,
 
     /// Whether to run the server in development mode
     dev_mode: bool,
@@ -68,7 +68,7 @@ impl Config {
         key: Option<String>,
         host: String,
         port: u16,
-        namespace_dir: Option<PathBuf>,
+        project_dir: Option<PathBuf>,
         dev_mode: bool,
     ) -> MicrosandboxServerResult<Self> {
         // Check key requirement based on dev mode
@@ -88,12 +88,12 @@ impl Config {
         })?;
 
         let addr = SocketAddr::new(host_ip, port);
-        let namespace_dir = namespace_dir
-            .unwrap_or_else(|| env::get_microsandbox_home_path().join(NAMESPACES_SUBDIR));
+        let project_dir =
+            project_dir.unwrap_or_else(|| env::get_microsandbox_home_path().join(PROJECTS_SUBDIR));
 
         Ok(Self {
             key,
-            namespace_dir,
+            project_dir,
             dev_mode,
             host: host_ip,
             port,
