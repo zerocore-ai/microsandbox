@@ -5,8 +5,8 @@
 //! - Parsing and validating image references (tags and digests)
 //! - Managing image manifests, configurations, and layers
 
-mod global_cache;
 mod auth;
+mod global_cache;
 mod image;
 mod layer;
 #[cfg(test)]
@@ -20,8 +20,8 @@ mod tests;
 // Exports
 //--------------------------------------------------------------------------------------------------
 
-pub(crate) use global_cache::*;
 pub use auth::{normalize_registry_host, registry_host_for_reference, resolve_registry_auth};
+pub(crate) use global_cache::*;
 pub use image::*;
 pub(crate) use layer::*;
 pub use reference::*;

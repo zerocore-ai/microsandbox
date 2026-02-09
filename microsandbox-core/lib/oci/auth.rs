@@ -1,8 +1,6 @@
 use oci_client::secrets::RegistryAuth;
 
-use microsandbox_utils::{
-    StoredRegistryCredentials, env, load_stored_registry_credentials,
-};
+use microsandbox_utils::{StoredRegistryCredentials, env, load_stored_registry_credentials};
 
 use crate::{MicrosandboxError, MicrosandboxResult, oci::Reference};
 
@@ -102,7 +100,9 @@ mod tests {
     use super::*;
     use std::sync::Mutex;
 
-    use microsandbox_utils::{StoredRegistryCredentials, clear_registry_credentials, store_registry_credentials};
+    use microsandbox_utils::{
+        StoredRegistryCredentials, clear_registry_credentials, store_registry_credentials,
+    };
     use tempfile::TempDir;
 
     static ENV_LOCK: Mutex<()> = Mutex::new(());
