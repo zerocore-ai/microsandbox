@@ -16,7 +16,7 @@ func basicMetricsExample() {
 		msb.WithName("metrics-example"),
 	)
 
-	if err := sandbox.Start("", 512, 1); err != nil {
+	if err := sandbox.Start(msb.StartConfig{Memory: 512, CPUs: 1}); err != nil {
 		log.Fatalf("Failed to start sandbox: %v", err)
 	}
 	defer func() {
@@ -78,7 +78,7 @@ func allMetricsExample() {
 		msb.WithName("all-metrics-example"),
 	)
 
-	if err := sandbox.Start("", 512, 1); err != nil {
+	if err := sandbox.Start(msb.StartConfig{Memory: 512, CPUs: 1}); err != nil {
 		log.Fatalf("Failed to start sandbox: %v", err)
 	}
 	defer func() {
@@ -123,7 +123,7 @@ func continuousMonitoringExample() {
 		msb.WithName("monitoring-example"),
 	)
 
-	if err := sandbox.Start("", 512, 1); err != nil {
+	if err := sandbox.Start(msb.StartConfig{Memory: 512, CPUs: 1}); err != nil {
 		log.Fatalf("Failed to start sandbox: %v", err)
 	}
 	defer func() {
@@ -178,7 +178,7 @@ func cpuLoadTestExample() {
 		msb.WithName("cpu-load-test"),
 	)
 
-	if err := sandbox.Start("", 1024, 2); err != nil {
+	if err := sandbox.Start(msb.StartConfig{Memory: 1024, CPUs: 2}); err != nil {
 		log.Fatalf("Failed to start sandbox: %v", err)
 	}
 	defer func() {
@@ -268,7 +268,7 @@ func errorHandlingExample() {
 
 	// Now properly start the sandbox
 	fmt.Println("\nStarting the sandbox properly...")
-	if err := sandbox.Start("", 512, 1); err != nil {
+	if err := sandbox.Start(msb.StartConfig{Memory: 512, CPUs: 1}); err != nil {
 		log.Fatalf("Failed to start sandbox: %v", err)
 	}
 	defer func() {

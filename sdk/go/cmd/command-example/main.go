@@ -17,7 +17,7 @@ func basicExample() {
 	)
 
 	// Start the sandbox
-	if err := sandbox.Start("", 512, 1); err != nil {
+	if err := sandbox.Start(msb.StartConfig{Memory: 512, CPUs: 1}); err != nil {
 		log.Fatalf("Failed to start sandbox: %v", err)
 	}
 	defer func() {
@@ -76,7 +76,7 @@ func errorHandlingExample() {
 		msb.WithName("error-example"),
 	)
 
-	if err := sandbox.Start("", 512, 1); err != nil {
+	if err := sandbox.Start(msb.StartConfig{Memory: 512, CPUs: 1}); err != nil {
 		log.Fatalf("Failed to start sandbox: %v", err)
 	}
 	defer func() {
@@ -117,7 +117,7 @@ func advancedExample() {
 		msb.WithName("advanced-example"),
 	)
 
-	if err := sandbox.Start("", 1024, 2); err != nil {
+	if err := sandbox.Start(msb.StartConfig{Memory: 1024, CPUs: 2}); err != nil {
 		log.Fatalf("Failed to start sandbox: %v", err)
 	}
 	defer func() {
@@ -203,7 +203,7 @@ func explicitLifecycleExample() {
 
 	// Manually start the sandbox
 	fmt.Println("Starting sandbox...")
-	if err := sandbox.Start("", 512, 1); err != nil {
+	if err := sandbox.Start(msb.StartConfig{Memory: 512, CPUs: 1}); err != nil {
 		log.Fatalf("Failed to start sandbox: %v", err)
 	}
 
