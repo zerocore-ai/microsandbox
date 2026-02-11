@@ -92,6 +92,7 @@ uzers = "0.12"
 walkdir = "2.4"
 which = "8"
 xattr = "1.3"
+rstest = "0.26"
 
 [patch.crates-io]
 oci-client = { git = "https://github.com/toksdotdev/rust-oci-client.git", branch = "toks/string-impl-for-enums" }
