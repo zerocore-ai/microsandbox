@@ -17,7 +17,7 @@
 //!     --log-level=3 \
 //!     --native-rootfs=/path/to/rootfs \
 //!     --overlayfs-rootfs=/path/to/rootfs \
-//!     --num-vcpus=2 \
+//!     --num-vcpus=0.5 \
 //!     --memory-mib=1024 \
 //!     --workdir-path=/app \
 //!     --exec-path=/usr/bin/python3 \
@@ -41,7 +41,7 @@
 //!     --log-level=3 \
 //!     --native-rootfs=/path/to/rootfs \
 //!     --overlayfs-rootfs=/path/to/rootfs \
-//!     --num-vcpus=2 \
+//!     --num-vcpus=0.5 \
 //!     --memory-mib=1024 \
 //!     --workdir-path=/app \
 //!     --exec-path=/usr/bin/python3 \
@@ -256,6 +256,7 @@ async fn main() -> Result<()> {
                 log_dir.clone(),
                 rootfs.clone(),
                 forward_output,
+                num_vcpus,
             )
             .await?;
 

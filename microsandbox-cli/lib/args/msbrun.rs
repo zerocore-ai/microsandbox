@@ -35,9 +35,9 @@ pub enum McrunSubcommand {
         #[arg(long)]
         overlayfs_layer: Vec<PathBuf>,
 
-        /// Number of virtual CPUs
+        /// Number of virtual CPUs (supports fractional values)
         #[arg(long)]
-        num_vcpus: Option<u8>,
+        num_vcpus: Option<f32>,
 
         /// Memory size in MiB
         #[arg(long)]
@@ -119,9 +119,9 @@ pub enum McrunSubcommand {
         #[arg(long)]
         overlayfs_layer: Vec<PathBuf>,
 
-        /// Number of virtual CPUs
+        /// Number of virtual CPUs (supports fractional values)
         #[arg(long)]
-        num_vcpus: Option<u8>,
+        num_vcpus: Option<f32>,
 
         /// Memory size in MiB
         #[arg(long)]

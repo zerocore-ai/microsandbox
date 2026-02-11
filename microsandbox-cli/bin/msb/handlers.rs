@@ -54,7 +54,7 @@ pub async fn add_subcommand(
     names: Vec<String>,
     image: String,
     memory: Option<u32>,
-    cpus: Option<u32>,
+    cpus: Option<f32>,
     volumes: Vec<String>,
     ports: Vec<String>,
     envs: Vec<String>,
@@ -219,7 +219,7 @@ pub async fn script_run_subcommand(
 #[allow(clippy::too_many_arguments)]
 pub async fn exe_subcommand(
     name: String,
-    cpus: Option<u8>,
+    cpus: Option<f32>,
     memory: Option<u32>,
     volumes: Vec<String>,
     ports: Vec<String>,
@@ -472,7 +472,7 @@ pub async fn self_subcommand(action: SelfAction) -> MicrosandboxCliResult<()> {
 pub async fn install_subcommand(
     name: String,
     alias: Option<String>,
-    cpus: Option<u8>,
+    cpus: Option<f32>,
     memory: Option<u32>,
     volumes: Vec<String>,
     ports: Vec<String>,

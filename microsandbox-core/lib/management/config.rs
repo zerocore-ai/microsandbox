@@ -35,7 +35,7 @@ pub struct SandboxConfig {
     pub memory: Option<u32>,
 
     /// The number of CPUs to use.
-    pub cpus: Option<u32>,
+    pub cpus: Option<f32>,
 
     /// The volumes to mount.
     pub volumes: Vec<String>,
@@ -168,7 +168,7 @@ pub async fn add(
                 }
 
                 if let Some(cpus_value) = config.cpus {
-                    sandbox_mapping.insert_u32("cpus", cpus_value);
+                    sandbox_mapping.insert_f32("cpus", cpus_value);
                 }
 
                 // Add shell (default if not provided)

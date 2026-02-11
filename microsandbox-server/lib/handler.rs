@@ -37,7 +37,7 @@ use crate::{
     payload::{
         JSONRPC_VERSION, JsonRpcError, JsonRpcRequest, JsonRpcResponse,
         JsonRpcResponseOrNotification, RegularMessageResponse, SandboxMetricsGetParams,
-        SandboxStartParams, SandboxStopParams,
+        SandboxStartParams, SandboxStopParams, SandboxConfig
     },
     state::AppState,
 };
@@ -349,7 +349,7 @@ pub async fn forward_rpc_to_portal(
 /// Implementation for starting a sandbox
 pub async fn sandbox_start_impl(
     state: AppState,
-    params: SandboxStartParams,
+    mut params: SandboxStartParams,
 ) -> ServerResult<String> {
     // Validate sandbox name and namespace
     validate_sandbox_name(&params.sandbox)?;
@@ -397,6 +397,10 @@ pub async fn sandbox_start_impl(
                 sandbox
             )),
         ));
+    }
+
+    if let Some(config) = params.config.as_mut() {
+        adjust_config_for_platform(config);
     }
 
     // Load or create the config
@@ -711,6 +715,69 @@ pub async fn sandbox_start_impl(
                 params.sandbox
             ))
         }
+    }
+}
+
+fn adjust_config_for_platform(config: &mut SandboxConfig) {
+    if let Some(cpus) = config.cpus
+        && cpus < 1.0
+        && !cfg!(target_os = "linux")
+    {
+        tracing::warn!("fractional CPUs are only supported on Linux; using cpus=1.0");
+        config.cpus = Some(1.0);
+    }
+}
+
+//--------------------------------------------------------------------------------------------------
+// Tests
+//--------------------------------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::adjust_config_for_platform;
+    use crate::payload::SandboxConfig;
+    use std::collections::HashMap;
+
+    #[cfg(not(target_os = "linux"))]
+    #[test]
+    fn adjusts_fractional_cpus_to_one_on_non_linux() {
+        let mut config = SandboxConfig {
+            image: Some("alpine:latest".to_string()),
+            memory: None,
+            cpus: Some(0.1),
+            volumes: vec![],
+            ports: vec![],
+            envs: vec![],
+            depends_on: vec![],
+            workdir: None,
+            shell: None,
+            scripts: HashMap::new(),
+            exec: None,
+        };
+
+        adjust_config_for_platform(&mut config);
+        assert_eq!(config.cpus, Some(1.0));
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn keeps_fractional_cpus_on_linux() {
+        let mut config = SandboxConfig {
+            image: Some("alpine:latest".to_string()),
+            memory: None,
+            cpus: Some(0.1),
+            volumes: vec![],
+            ports: vec![],
+            envs: vec![],
+            depends_on: vec![],
+            workdir: None,
+            shell: None,
+            scripts: HashMap::new(),
+            exec: None,
+        };
+
+        adjust_config_for_platform(&mut config);
+        assert_eq!(config.cpus, Some(0.1));
     }
 }
 

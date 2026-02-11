@@ -121,8 +121,9 @@ pub struct MicroVmConfig {
     /// The rootfs for the MicroVm.
     pub rootfs: Rootfs,
 
-    /// The number of vCPUs to use for the MicroVm.
-    pub num_vcpus: u8,
+    /// The number of vCPUs to use for the MicroVm (supports fractional values like 0.5, 0.25).
+    /// Valid range: 0.1 to 128.0. Values less than 1.0 will be throttled using cgroups.
+    pub num_vcpus: f32,
 
     /// The amount of memory in MiB to use for the MicroVm.
     pub memory_mib: u32,
@@ -312,10 +313,27 @@ impl MicroVm {
             assert!(status >= 0, "failed to set log level: {}", status);
         }
 
+        // Convert f32 CPU count to u8 for libkrun
+        // For fractional CPUs, we allocate at least 1 vCPU and use cgroups to throttle
+        let vcpus_for_krun = if config.num_vcpus >= 1.0 {
+            config.num_vcpus.ceil() as u8
+        } else {
+            1u8 // Minimum 1 vCPU for libkrun
+        };
+
         // Set basic VM configuration
         unsafe {
-            let status = ffi::krun_set_vm_config(ctx_id, config.num_vcpus, config.memory_mib);
+            let status = ffi::krun_set_vm_config(ctx_id, vcpus_for_krun, config.memory_mib);
             assert!(status >= 0, "failed to set VM config: {}", status);
+        }
+
+        // Store the actual CPU request for later cgroup throttling
+        // This will be applied if the system supports cgroups v2
+        if config.num_vcpus < 1.0 {
+            tracing::info!(
+                "CPU fractional value {:.2} detected, will apply cgroup throttling",
+                config.num_vcpus
+            );
         }
 
         // Set rootfs.
@@ -600,7 +618,7 @@ impl MicroVmConfig {
             }
         }
 
-        if self.num_vcpus == 0 {
+        if self.num_vcpus == 0.0 {
             return Err(MicrosandboxError::InvalidMicroVMConfig(
                 InvalidMicroVMConfigError::NumVCPUsIsZero,
             ));

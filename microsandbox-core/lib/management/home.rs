@@ -147,7 +147,7 @@ pub async fn clean(force: bool) -> MicrosandboxResult<()> {
 ///     &image,
 ///     Some("shell"),          // Run shell script
 ///     Some("ubuntu-shell"),   // Custom alias
-///     Some(2),                // 2 CPUs
+///     Some(2.0),                // 2 CPUs
 ///     Some(1024),             // 1GB RAM
 ///     vec![                   // Mount host's /tmp to sandbox's /data
 ///         "/tmp:/data".to_string()
@@ -172,7 +172,7 @@ pub async fn install(
     image: &Reference,
     script: Option<&str>,
     alias: Option<&str>,
-    cpus: Option<u8>,
+    cpus: Option<f32>,
     memory: Option<u32>,
     volumes: Vec<String>,
     ports: Vec<String>,

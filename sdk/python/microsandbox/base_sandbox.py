@@ -9,12 +9,14 @@ from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
 from typing import Optional
 
+import logging
 import aiohttp
 from dotenv import load_dotenv
 
 from .command import Command
 from .metrics import Metrics
 
+logger = logging.getLogger(__name__)
 
 class BaseSandbox(ABC):
     """
@@ -75,6 +77,9 @@ class BaseSandbox(ABC):
         namespace: str = "default",
         name: Optional[str] = None,
         api_key: Optional[str] = None,
+        cpus: Optional[float] = None,
+        memory: Optional[int] = None,
+        timeout: Optional[int] = None,
     ):
         """
         Create and initialize a new sandbox as an async context manager.
@@ -84,6 +89,9 @@ class BaseSandbox(ABC):
             namespace: Namespace for the sandbox
             name: Optional name for the sandbox. If not provided, a random name will be generated.
             api_key: API key for Microsandbox server authentication. If not provided, it will be read from MSB_API_KEY environment variable.
+            cpus: Number of CPUs to allocate to the sandbox
+            memory: Amount of memory (in MB) to allocate to the sandbox
+            timeout: Maximum time in seconds to wait for the sandbox to start
 
         Returns:
             An instance of the sandbox ready for use
@@ -106,7 +114,14 @@ class BaseSandbox(ABC):
             # Create HTTP session
             sandbox._session = aiohttp.ClientSession()
             # Start the sandbox
-            await sandbox.start()
+            start_kwargs = {}
+            if cpus is not None:
+                start_kwargs["cpus"] = cpus
+            if memory is not None:
+                start_kwargs["memory"] = memory
+            if timeout is not None:
+                start_kwargs["timeout"] = timeout
+            await sandbox.start(**start_kwargs)
             yield sandbox
         finally:
             # Stop the sandbox
@@ -129,7 +144,7 @@ class BaseSandbox(ABC):
         Args:
             image: Docker image to use for the sandbox (defaults to language-specific image)
             memory: Memory limit in MB
-            cpus: CPU limit (will be rounded to nearest integer)
+            cpus: CPU limit (supports fractional values like 0.5)
             timeout: Maximum time in seconds to wait for the sandbox to start (default: 180 seconds)
 
         Raises:
@@ -138,6 +153,16 @@ class BaseSandbox(ABC):
         """
         if self._is_started:
             return
+
+        if cpus < 1.0:
+            import platform
+
+            if platform.system() != "Linux":
+                logger.warning(
+                    "Fractional CPUs are only supported on Linux. "
+                    "Using default cpus=1.0."
+                )
+                cpus = 1.0
 
         sandbox_image = image or await self.get_default_image()
         request_data = {
@@ -149,7 +174,7 @@ class BaseSandbox(ABC):
                 "config": {
                     "image": sandbox_image,
                     "memory": memory,
-                    "cpus": int(round(cpus)),
+                    "cpus": cpus,
                 },
             },
             "id": str(uuid.uuid4()),

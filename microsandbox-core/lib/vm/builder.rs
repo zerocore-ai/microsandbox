@@ -38,7 +38,7 @@ use super::{
 pub struct MicroVmConfigBuilder<R, E> {
     log_level: LogLevel,
     rootfs: R,
-    num_vcpus: u8,
+    num_vcpus: f32,
     memory_mib: u32,
     mapped_dirs: Vec<PathPair>,
     port_map: Vec<PortPair>,
@@ -89,7 +89,7 @@ pub struct MicroVmConfigBuilder<R, E> {
 /// let vm = MicroVmBuilder::default()
 ///     .log_level(LogLevel::Debug)
 ///     .rootfs(Rootfs::Native(PathBuf::from("/tmp")))
-///     .num_vcpus(2)
+///     .num_vcpus(2.0)
 ///     .memory_mib(1024)
 ///     .mapped_dirs(["/home:/guest/mount".parse()?])
 ///     .port_map(["8080:80".parse()?])
@@ -192,6 +192,7 @@ impl<R, M> MicroVmConfigBuilder<R, M> {
     /// Sets the number of virtual CPUs (vCPUs) for the MicroVm.
     ///
     /// This determines how many CPU cores are available to the guest system.
+    /// Supports fractional values (e.g., 0.5, 0.25) for CPU throttling.
     ///
     /// ## Examples
     ///
@@ -199,14 +200,17 @@ impl<R, M> MicroVmConfigBuilder<R, M> {
     /// use microsandbox_core::vm::MicroVmConfigBuilder;
     ///
     /// let config = MicroVmConfigBuilder::default()
-    ///     .num_vcpus(2);  // Allocate 2 virtual CPU cores
+    ///     .num_vcpus(2.0);      // Allocate 2 virtual CPU cores
+    /// let config = MicroVmConfigBuilder::default()
+    ///     .num_vcpus(0.5);      // Allocate 0.5 CPU (50% of one core)
     /// ```
     ///
     /// ## Notes
-    /// - The default is 1 vCPU if not specified
-    /// - The number of vCPUs should not exceed the host's physical CPU cores
+    /// - The default is 1.0 vCPU if not specified
+    /// - Valid range: 0.1 to 128.0
+    /// - Fractional values (< 1.0) will be throttled using cgroups
     /// - More vCPUs aren't always better - consider the workload's needs
-    pub fn num_vcpus(mut self, num_vcpus: u8) -> Self {
+    pub fn num_vcpus(mut self, num_vcpus: f32) -> Self {
         self.num_vcpus = num_vcpus;
         self
     }
@@ -275,11 +279,11 @@ impl<R, M> MicroVmConfigBuilder<R, M> {
     /// ## Examples
     ///
     /// ```rust
-    /// use microsandbox_core::vm::MicroVmConfigBuilder;
+    /// use microsandbox_core::vm::MicroVmBuilder;
     /// use microsandbox_core::config::PortPair;
     ///
     /// # fn main() -> anyhow::Result<()> {
-    /// let config = MicroVmConfigBuilder::default()
+    /// let vm = MicroVmBuilder::default()
     ///     .port_map([
     ///         // Map host port 8080 to guest port 80
     ///         "8080:80".parse()?,
@@ -654,7 +658,8 @@ impl<R, M> MicroVmBuilder<R, M> {
 
     /// Sets the number of virtual CPUs (vCPUs) for the MicroVm.
     ///
-    /// This determines how many CPU cores are available to the guest system.
+    /// This determines how many CPU cores are available to the guest system and
+    /// supports fractional CPU values where supported.
     ///
     /// ## Examples
     ///
@@ -667,7 +672,7 @@ impl<R, M> MicroVmBuilder<R, M> {
     /// let vm = MicroVmBuilder::default()
     ///     .rootfs(Rootfs::Native(temp_dir.path().to_path_buf()))
     ///     .memory_mib(1024)
-    ///     .num_vcpus(2)  // Allocate 2 virtual CPU cores
+    ///     .num_vcpus(2.0)  // Allocate 2 virtual CPU cores
     ///     .exec_path("/bin/echo")
     ///     .build()?;
     /// # Ok(())
@@ -677,8 +682,11 @@ impl<R, M> MicroVmBuilder<R, M> {
     /// ## Notes
     /// - The default is 1 vCPU if not specified
     /// - More vCPUs aren't always better - consider the workload's needs
-    pub fn num_vcpus(mut self, num_vcpus: u8) -> Self {
-        self.inner = self.inner.num_vcpus(num_vcpus);
+    pub fn num_vcpus<T>(mut self, num_vcpus: T) -> Self
+    where
+        T: Into<f32>,
+    {
+        self.inner = self.inner.num_vcpus(num_vcpus.into());
         self
     }
 
@@ -1134,7 +1142,7 @@ mod tests {
         let builder = MicroVmBuilder::default()
             .log_level(LogLevel::Debug)
             .rootfs(rootfs.clone())
-            .num_vcpus(2)
+            .num_vcpus(2u8)
             .memory_mib(1024)
             .mapped_dirs(["/guest/mount:/host/mount".parse()?])
             .port_map(["8080:80".parse()?])
@@ -1147,7 +1155,7 @@ mod tests {
 
         assert_eq!(builder.inner.log_level, LogLevel::Debug);
         assert_eq!(builder.inner.rootfs, rootfs);
-        assert_eq!(builder.inner.num_vcpus, 2);
+        assert_eq!(builder.inner.num_vcpus, 2.0);
         assert_eq!(builder.inner.memory_mib, 1024);
         assert_eq!(
             builder.inner.mapped_dirs,
@@ -1197,5 +1205,36 @@ mod tests {
         assert!(builder.inner.env.is_empty());
         assert_eq!(builder.inner.console_output, None);
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod fractional_cpu_tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    #[test]
+    fn microvm_config_builder_preserves_fractional_num_vcpus() {
+        let tmp = TempDir::new().unwrap();
+        let cfg = MicroVmConfigBuilder::default()
+            .rootfs(Rootfs::Native(tmp.path().to_path_buf()))
+            .exec_path("/bin/echo")
+            .num_vcpus(0.5)
+            .memory_mib(256)
+            .build();
+
+        assert_eq!(cfg.num_vcpus, 0.5);
+        assert_eq!(cfg.memory_mib, 256);
+    }
+
+    #[test]
+    fn microvm_config_builder_allows_smallest_practical_fraction() {
+        let tmp = TempDir::new().unwrap();
+        let cfg = MicroVmConfigBuilder::default()
+            .rootfs(Rootfs::Native(tmp.path().to_path_buf()))
+            .exec_path("/bin/echo")
+            .num_vcpus(0.25)
+            .build();
+        assert_eq!(cfg.num_vcpus, 0.25);
     }
 }
