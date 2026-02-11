@@ -514,8 +514,9 @@ pub async fn apply_image_defaults(
         tracing::info!("applying defaults from image configuration");
 
         // Apply working directory if not set in sandbox
-        if sandbox_config.get_workdir().is_none() && config.config_working_dir.is_some() {
-            let workdir = config.config_working_dir.unwrap();
+        if sandbox_config.get_workdir().is_none()
+            && let Some(workdir) = config.config_working_dir
+        {
             tracing::debug!("using image working directory: {}", workdir);
             let workdir_path = Utf8UnixPathBuf::from(workdir);
             sandbox_config.workdir = Some(workdir_path);
