@@ -59,7 +59,7 @@ async fn example_explicit_lifecycle() -> Result<(), Box<dyn Error + Send + Sync>
         image: None,
         memory: 1024, // 1GB RAM
         cpus: 2.0,    // 2 CPU cores
-        timeout: 180.0,
+        ..Default::default()
     };
 
     // Start the sandbox
