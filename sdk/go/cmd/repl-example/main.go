@@ -17,7 +17,7 @@ func contextManagerEquivalentExample() {
 	)
 
 	// Start the sandbox
-	if err := sandbox.Start("", 512, 1); err != nil {
+	if err := sandbox.Start(msb.StartConfig{Memory: 512, CPUs: 1}); err != nil {
 		log.Fatalf("Failed to start sandbox: %v", err)
 	}
 	// Use defer for automatic cleanup (Go's equivalent of context manager)
@@ -52,7 +52,7 @@ func explicitLifecycleExample() {
 	)
 
 	// Start with resource constraints
-	if err := sandbox.Start("", 1024, 2); err != nil { // 1GB RAM, 2 CPU cores
+	if err := sandbox.Start(msb.StartConfig{Memory: 1024, CPUs: 2}); err != nil { // 1GB RAM, 2 CPU cores
 		log.Fatalf("Failed to start sandbox: %v", err)
 	}
 
@@ -106,7 +106,7 @@ func executionChainingExample() {
 		msb.WithName("sandbox-chain"),
 	)
 
-	if err := sandbox.Start("", 512, 1); err != nil {
+	if err := sandbox.Start(msb.StartConfig{Memory: 512, CPUs: 1}); err != nil {
 		log.Fatalf("Failed to start sandbox: %v", err)
 	}
 	defer func() {
@@ -149,7 +149,7 @@ func dataProcessingExample() {
 		msb.WithName("sandbox-data"),
 	)
 
-	if err := sandbox.Start("", 1024, 2); err != nil {
+	if err := sandbox.Start(msb.StartConfig{Memory: 1024, CPUs: 2}); err != nil {
 		log.Fatalf("Failed to start sandbox: %v", err)
 	}
 	defer func() {
@@ -227,7 +227,7 @@ func errorRecoveryExample() {
 		msb.WithName("sandbox-error-recovery"),
 	)
 
-	if err := sandbox.Start("", 512, 1); err != nil {
+	if err := sandbox.Start(msb.StartConfig{Memory: 512, CPUs: 1}); err != nil {
 		log.Fatalf("Failed to start sandbox: %v", err)
 	}
 	defer func() {

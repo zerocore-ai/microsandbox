@@ -13,7 +13,7 @@ import (
 
 // rpcClient is an internal interface for keeping the microsandbox interactions decoupled from the kind of transport being used
 type rpcClient interface {
-	startSandbox(ctx context.Context, cfg *config, image string, memory int, cpus int) error
+	startSandbox(ctx context.Context, cfg *config, sc startConfig) error
 	stopSandbox(ctx context.Context, cfg *config) error
 	runRepl(ctx context.Context, cfg *config, lang progLang, code string) (*executionResult, error)
 	runCommand(ctx context.Context, cfg *config, command string, args []string) (*executionResult, error)
@@ -64,9 +64,17 @@ type startParams struct {
 }
 
 type startConfig struct {
-	Image  string `json:"image"`
-	Memory int    `json:"memory"`
-	CPUs   int    `json:"cpus"`
+	Image     string            `json:"image"`
+	Memory    int               `json:"memory"`
+	CPUs      int               `json:"cpus"`
+	Volumes   []string          `json:"volumes,omitempty"`
+	Ports     []string          `json:"ports,omitempty"`
+	Envs      []string          `json:"envs,omitempty"`
+	DependsOn []string          `json:"depends_on,omitempty"`
+	Workdir   string            `json:"workdir,omitempty"`
+	Shell     string            `json:"shell,omitempty"`
+	Scripts   map[string]string `json:"scripts,omitempty"`
+	Exec      string            `json:"exec,omitempty"`
 }
 
 type stopParams struct {
@@ -199,18 +207,14 @@ func (d *jsonRPCHTTPClient) makeJSONRPCRequest(ctx context.Context, serverURL st
 	return jsonResp, nil
 }
 
-func (d *jsonRPCHTTPClient) startSandbox(ctx context.Context, cfg *config, image string, memory int, cpus int) error {
+func (d *jsonRPCHTTPClient) startSandbox(ctx context.Context, cfg *config, sc startConfig) error {
 	params := startParams{
 		Namespace: cfg.namespace,
 		Sandbox:   cfg.name,
-		Config: startConfig{
-			Image:  image,
-			Memory: memory,
-			CPUs:   cpus,
-		},
+		Config:    sc,
 	}
 
-	cfg.logger.Info("Starting sandbox", "name", cfg.name, "namespace", cfg.namespace, "image", image, "memory", memory, "cpus", cpus)
+	cfg.logger.Info("Starting sandbox", "name", cfg.name, "namespace", cfg.namespace, "image", sc.Image, "memory", sc.Memory, "cpus", sc.CPUs)
 	_, err := d.makeJSONRPCRequest(ctx, cfg.serverUrl, methodSandboxStart, params, cfg.apiKey, cfg.logger, cfg.reqIDPrd)
 	if err == nil {
 		cfg.logger.Info("Sandbox started successfully", "name", cfg.name)

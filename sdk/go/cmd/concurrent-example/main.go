@@ -19,7 +19,7 @@ func sequentialExample() {
 		msb.WithName("sequential-example"),
 	)
 
-	if err := sandbox.Start("", 512, 1); err != nil {
+	if err := sandbox.Start(msb.StartConfig{Memory: 512, CPUs: 1}); err != nil {
 		log.Fatalf("Failed to start sandbox: %v", err)
 	}
 	defer func() {
@@ -57,7 +57,7 @@ func goroutineConcurrentExample() {
 		msb.WithName("concurrent-example"),
 	)
 
-	if err := sandbox.Start("", 1024, 2); err != nil {
+	if err := sandbox.Start(msb.StartConfig{Memory: 1024, CPUs: 2}); err != nil {
 		log.Fatalf("Failed to start sandbox: %v", err)
 	}
 	defer func() {
@@ -117,7 +117,7 @@ func workerPoolExample() {
 		msb.WithName("worker-pool-example"),
 	)
 
-	if err := sandbox.Start("", 1024, 2); err != nil {
+	if err := sandbox.Start(msb.StartConfig{Memory: 1024, CPUs: 2}); err != nil {
 		log.Fatalf("Failed to start sandbox: %v", err)
 	}
 	defer func() {
@@ -200,7 +200,7 @@ func contextCancellationExample() {
 		msb.WithHTTPClient(client),
 	)
 
-	if err := sandbox.Start("", 512, 1); err != nil {
+	if err := sandbox.Start(msb.StartConfig{Memory: 512, CPUs: 1}); err != nil {
 		log.Fatalf("Failed to start sandbox: %v", err)
 	}
 	defer func() {
@@ -252,7 +252,7 @@ func channelCoordinationExample() {
 		msb.WithName("channel-coordination"),
 	)
 
-	if err := sandbox.Start("", 1024, 2); err != nil {
+	if err := sandbox.Start(msb.StartConfig{Memory: 1024, CPUs: 2}); err != nil {
 		log.Fatalf("Failed to start sandbox: %v", err)
 	}
 	defer func() {
@@ -343,7 +343,7 @@ func metricsMonitoringExample() {
 		msb.WithName("metrics-monitoring"),
 	)
 
-	if err := sandbox.Start("", 1024, 2); err != nil {
+	if err := sandbox.Start(msb.StartConfig{Memory: 1024, CPUs: 2}); err != nil {
 		log.Fatalf("Failed to start sandbox: %v", err)
 	}
 	defer func() {

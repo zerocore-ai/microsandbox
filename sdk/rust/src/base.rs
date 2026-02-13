@@ -1,12 +1,9 @@
-use std::collections::HashMap;
-use std::env;
-use std::error::Error;
-use std::time::Duration;
+use std::{collections::HashMap, env, error::Error, time::Duration};
 
 use dotenv::dotenv;
-use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
+use reqwest::header::{AUTHORIZATION, CONTENT_TYPE, HeaderMap, HeaderValue};
 use serde::Deserialize;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use uuid::Uuid;
 
 use crate::{Execution, SandboxError, SandboxOptions};
@@ -137,26 +134,53 @@ impl SandboxBase {
     pub async fn start_sandbox(
         &mut self,
         image: Option<String>,
-        memory: u32,
-        cpus: f32,
-        timeout: f32,
+        opts: &crate::StartOptions,
     ) -> Result<(), Box<dyn Error + Send + Sync>> {
         if self.is_started {
             return Ok(());
         }
 
+        let mut config = json!({
+            "image": image,
+            "memory": opts.memory,
+            "cpus": opts.cpus.round() as i32,
+        });
+
+        if let Some(obj) = config.as_object_mut() {
+            if !opts.volumes.is_empty() {
+                obj.insert("volumes".to_string(), json!(opts.volumes));
+            }
+            if !opts.ports.is_empty() {
+                obj.insert("ports".to_string(), json!(opts.ports));
+            }
+            if !opts.envs.is_empty() {
+                obj.insert("envs".to_string(), json!(opts.envs));
+            }
+            if !opts.depends_on.is_empty() {
+                obj.insert("depends_on".to_string(), json!(opts.depends_on));
+            }
+            if let Some(ref workdir) = opts.workdir {
+                obj.insert("workdir".to_string(), json!(workdir));
+            }
+            if let Some(ref shell) = opts.shell {
+                obj.insert("shell".to_string(), json!(shell));
+            }
+            if !opts.scripts.is_empty() {
+                obj.insert("scripts".to_string(), json!(opts.scripts));
+            }
+            if let Some(ref exec) = opts.exec {
+                obj.insert("exec".to_string(), json!(exec));
+            }
+        }
+
         let params = json!({
             "namespace": self.namespace,
             "sandbox": self.name,
-            "config": {
-                "image": image,
-                "memory": memory,
-                "cpus": cpus.round() as i32,
-            }
+            "config": config,
         });
 
         // Set client timeout to be slightly longer than the server timeout
-        let client_timeout = Duration::from_secs_f32(timeout + 30.0);
+        let client_timeout = Duration::from_secs_f32(opts.timeout + 30.0);
         let client = reqwest::Client::builder().timeout(client_timeout).build()?;
 
         let request_data = json!({
@@ -190,7 +214,7 @@ impl SandboxBase {
                 if e.is_timeout() {
                     return Err(Box::new(SandboxError::Timeout(format!(
                         "Timed out waiting for sandbox to start after {} seconds",
-                        timeout
+                        opts.timeout
                     ))));
                 }
                 return Err(Box::new(SandboxError::HttpError(e.to_string())));

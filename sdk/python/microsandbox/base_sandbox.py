@@ -7,7 +7,7 @@ import os
 import uuid
 from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
-from typing import Optional
+from typing import Dict, List, Optional
 
 import aiohttp
 from dotenv import load_dotenv
@@ -121,6 +121,14 @@ class BaseSandbox(ABC):
         image: Optional[str] = None,
         memory: int = 512,
         cpus: float = 1.0,
+        volumes: Optional[List[str]] = None,
+        ports: Optional[List[str]] = None,
+        envs: Optional[List[str]] = None,
+        depends_on: Optional[List[str]] = None,
+        workdir: Optional[str] = None,
+        shell: Optional[str] = None,
+        scripts: Optional[Dict[str, str]] = None,
+        exec: Optional[str] = None,
         timeout: float = 180.0,
     ) -> None:
         """
@@ -130,6 +138,14 @@ class BaseSandbox(ABC):
             image: Docker image to use for the sandbox (defaults to language-specific image)
             memory: Memory limit in MB
             cpus: CPU limit (will be rounded to nearest integer)
+            volumes: Volumes to mount
+            ports: Ports to expose
+            envs: Environment variables to use
+            depends_on: Sandboxes to depend on
+            workdir: Working directory to use
+            shell: Shell to use
+            scripts: Scripts that can be run
+            exec: Exec command to run
             timeout: Maximum time in seconds to wait for the sandbox to start (default: 180 seconds)
 
         Raises:
@@ -140,17 +156,35 @@ class BaseSandbox(ABC):
             return
 
         sandbox_image = image or await self.get_default_image()
+        config = {
+            "image": sandbox_image,
+            "memory": memory,
+            "cpus": int(round(cpus)),
+        }
+        if volumes is not None:
+            config["volumes"] = volumes
+        if ports is not None:
+            config["ports"] = ports
+        if envs is not None:
+            config["envs"] = envs
+        if depends_on is not None:
+            config["depends_on"] = depends_on
+        if workdir is not None:
+            config["workdir"] = workdir
+        if shell is not None:
+            config["shell"] = shell
+        if scripts is not None:
+            config["scripts"] = scripts
+        if exec is not None:
+            config["exec"] = exec
+
         request_data = {
             "jsonrpc": "2.0",
             "method": "sandbox.start",
             "params": {
                 "namespace": self._namespace,
                 "sandbox": self._name,
-                "config": {
-                    "image": sandbox_image,
-                    "memory": memory,
-                    "cpus": int(round(cpus)),
-                },
+                "config": config,
             },
             "id": str(uuid.uuid4()),
         }

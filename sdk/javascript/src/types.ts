@@ -42,6 +42,46 @@ export interface SandboxOptions {
   cpus?: number;
 
   /**
+   * Volumes to mount
+   */
+  volumes?: string[];
+
+  /**
+   * Ports to expose
+   */
+  ports?: string[];
+
+  /**
+   * Environment variables to use
+   */
+  envs?: string[];
+
+  /**
+   * Sandboxes to depend on
+   */
+  dependsOn?: string[];
+
+  /**
+   * Working directory to use
+   */
+  workdir?: string;
+
+  /**
+   * Shell to use
+   */
+  shell?: string;
+
+  /**
+   * Scripts that can be run
+   */
+  scripts?: Record<string, string>;
+
+  /**
+   * Exec command to run
+   */
+  exec?: string;
+
+  /**
    * Maximum time in seconds to wait for the sandbox to start
    */
   timeout?: number;
@@ -106,6 +146,70 @@ export class SandboxOptionsBuilder {
    */
   cpus(cpus: number): SandboxOptionsBuilder {
     this.options.cpus = cpus;
+    return this;
+  }
+
+  /**
+   * Set volumes
+   */
+  volumes(volumes: string[]): SandboxOptionsBuilder {
+    this.options.volumes = volumes;
+    return this;
+  }
+
+  /**
+   * Set ports
+   */
+  ports(ports: string[]): SandboxOptionsBuilder {
+    this.options.ports = ports;
+    return this;
+  }
+
+  /**
+   * Set environment variables
+   */
+  envs(envs: string[]): SandboxOptionsBuilder {
+    this.options.envs = envs;
+    return this;
+  }
+
+  /**
+   * Set sandbox dependencies
+   */
+  dependsOn(dependsOn: string[]): SandboxOptionsBuilder {
+    this.options.dependsOn = dependsOn;
+    return this;
+  }
+
+  /**
+   * Set working directory
+   */
+  workdir(workdir: string): SandboxOptionsBuilder {
+    this.options.workdir = workdir;
+    return this;
+  }
+
+  /**
+   * Set shell
+   */
+  shell(shell: string): SandboxOptionsBuilder {
+    this.options.shell = shell;
+    return this;
+  }
+
+  /**
+   * Set scripts
+   */
+  scripts(scripts: Record<string, string>): SandboxOptionsBuilder {
+    this.options.scripts = scripts;
+    return this;
+  }
+
+  /**
+   * Set exec command
+   */
+  exec(exec: string): SandboxOptionsBuilder {
+    this.options.exec = exec;
     return this;
   }
 
