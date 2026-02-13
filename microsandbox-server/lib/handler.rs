@@ -236,6 +236,8 @@ pub async fn forward_rpc_to_portal(
 
     // Create a full URL to the portal's JSON-RPC endpoint
     let portal_rpc_url = format!("{}/api/v1/rpc", portal_url);
+    // Create a health check URL
+    let portal_health_url = format!("{}/health", portal_url);
 
     debug!("Forwarding RPC to portal: {}", portal_rpc_url);
 
@@ -254,25 +256,39 @@ pub async fn forward_rpc_to_portal(
 
     // Keep trying to connect until we succeed or hit max retries
     while retry_count < MAX_RETRIES {
-        // Check if portal is available with a HEAD request
+        // Check if portal is available and ready using the health check endpoint
         match client
-            .head(&portal_url)
+            .head(&portal_health_url)
             .timeout(Duration::from_millis(TIMEOUT_MS))
             .send()
             .await
         {
             Ok(response) => {
-                // Any HTTP response (success or error) means we successfully connected
-                debug!(
-                    "Successfully connected to portal after {} retries (status: {})",
-                    retry_count,
-                    response.status()
-                );
-                break;
+                let status = response.status();
+                if status == reqwest::StatusCode::OK {
+                    debug!(
+                        "Successfully connected to portal after {} retries (status: {})",
+                        retry_count, status
+                    );
+                    break;
+                } else if status == reqwest::StatusCode::SERVICE_UNAVAILABLE {
+                    last_error = Some(format!("Portal not ready yet (status: {})", status));
+                    trace!(
+                        "Portal not ready (attempt {}), retrying...",
+                        retry_count + 1
+                    );
+                } else {
+                    last_error = Some(format!("Portal returned error status: {}", status));
+                    trace!(
+                        "Portal connection attempt {} returned {}, retrying...",
+                        retry_count + 1,
+                        status
+                    );
+                }
             }
             Err(e) => {
                 // Track the error for potential reporting but keep retrying
-                last_error = Some(e);
+                last_error = Some(e.to_string());
                 trace!("Connection attempt {} failed, retrying...", retry_count + 1);
             }
         }
