@@ -12,7 +12,7 @@
 //! - Success message formatting for sandbox operations
 //! - Detailed error information handling
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 
 //--------------------------------------------------------------------------------------------------
@@ -163,19 +163,19 @@ pub struct SandboxConfig {
     pub cpus: Option<u8>,
 
     /// The volumes to mount
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_null_as_default")]
     pub volumes: Vec<String>,
 
     /// The ports to expose
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_null_as_default")]
     pub ports: Vec<String>,
 
     /// The environment variables to use
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_null_as_default")]
     pub envs: Vec<String>,
 
     /// The sandboxes to depend on
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_null_as_default")]
     pub depends_on: Vec<String>,
 
     /// The working directory to use
@@ -185,7 +185,7 @@ pub struct SandboxConfig {
     pub shell: Option<String>,
 
     /// The scripts that can be run
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_null_as_default")]
     pub scripts: std::collections::HashMap<String, String>,
 
     /// The exec command to run
@@ -386,4 +386,18 @@ impl axum::response::IntoResponse for JsonRpcResponseOrNotification {
             }
         }
     }
+}
+
+//--------------------------------------------------------------------------------------------------
+// Functions: Helpers
+//--------------------------------------------------------------------------------------------------
+
+/// Deserializes a value that may be `null` into the type's default value.
+/// This is useful for fields where clients may send `null` instead of omitting the field.
+fn deserialize_null_as_default<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Default + Deserialize<'de>,
+{
+    Ok(Option::deserialize(deserializer)?.unwrap_or_default())
 }

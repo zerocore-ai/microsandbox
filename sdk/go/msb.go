@@ -8,7 +8,7 @@
 // Create a Python sandbox:
 //
 //	sandbox := msb.NewPythonSandbox(msb.WithName("my-sandbox"))
-//	if err := sandbox.Start("", 512, 1); err != nil {
+//	if err := sandbox.Start(msb.StartConfig{Memory: 512, CPUs: 1}); err != nil {
 //		log.Fatal(err)
 //	}
 //	defer sandbox.Stop()
@@ -49,9 +49,9 @@ type (
 	// Starter manages sandbox lifecycle startup.
 	Starter interface {
 		// Start initializes the sandbox with the specified configuration.
-		// If image is empty, uses the default image for the configured language.
-		// If memoryMB <= 0, defaults to 512. If cpus <= 0, defaults to 1.
-		Start(image string, memoryMB int, cpus int) error
+		// If Image is empty, uses the default image for the configured language.
+		// If Memory <= 0, defaults to 512. If CPUs <= 0, defaults to 1.
+		Start(config StartConfig) error
 	}
 
 	// Stopper manages sandbox lifecycle shutdown.
@@ -99,23 +99,51 @@ type (
 	}
 )
 
+// StartConfig holds the configuration for starting a sandbox.
+type StartConfig struct {
+	Image     string            // Docker image to use
+	Memory    int               // Memory limit in MB
+	CPUs      int               // CPU limit
+	Volumes   []string          // Volumes to mount
+	Ports     []string          // Ports to expose
+	Envs      []string          // Environment variables to use
+	DependsOn []string          // Sandboxes to depend on
+	Workdir   string            // Working directory to use
+	Shell     string            // Shell to use
+	Scripts   map[string]string // Scripts that can be run
+	Exec      string            // Exec command to run
+}
+
 // --- API Implementation ---
 
 type starter struct {
 	b *baseMicroSandbox
 }
 
-func (s starter) Start(image string, memoryMB int, cpus int) error {
+func (s starter) Start(cfg StartConfig) error {
 	if s.b.state.Load() == started {
 		return ErrSandboxAlreadyStarted
 	}
-	if memoryMB <= 0 {
-		memoryMB = 512
+	if cfg.Memory <= 0 {
+		cfg.Memory = 512
 	}
-	if cpus <= 0 {
-		cpus = 1
+	if cfg.CPUs <= 0 {
+		cfg.CPUs = 1
 	}
-	err := s.b.rpcClient.startSandbox(context.Background(), &s.b.cfg, image, memoryMB, cpus)
+	sc := startConfig{
+		Image:     cfg.Image,
+		Memory:    cfg.Memory,
+		CPUs:      cfg.CPUs,
+		Volumes:   cfg.Volumes,
+		Ports:     cfg.Ports,
+		Envs:      cfg.Envs,
+		DependsOn: cfg.DependsOn,
+		Workdir:   cfg.Workdir,
+		Shell:     cfg.Shell,
+		Scripts:   cfg.Scripts,
+		Exec:      cfg.Exec,
+	}
+	err := s.b.rpcClient.startSandbox(context.Background(), &s.b.cfg, sc)
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrFailedToStartSandbox, err)
 	}
