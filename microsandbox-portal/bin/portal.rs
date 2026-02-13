@@ -6,7 +6,10 @@
 use anyhow::Result;
 use clap::Parser;
 use microsandbox_utils::DEFAULT_PORTAL_GUEST_PORT;
-use std::{net::SocketAddr, sync::Arc};
+use std::{
+    net::SocketAddr,
+    sync::{Arc, atomic::Ordering},
+};
 use tokio::{net::TcpListener, signal};
 
 use microsandbox_portal::{
@@ -101,7 +104,7 @@ async fn main() -> Result<()> {
             tracing::info!("REPL engines started successfully");
             *engine_handle_for_shutdown.lock().await = Some(engine_handle.clone());
             *state.engine_handle.lock().await = Some(engine_handle);
-            *state.ready.lock().await = true;
+            state.ready.store(true, Ordering::Release);
         }
         Err(e) => {
             tracing::warn!("Failed to start REPL engines: {}", e);

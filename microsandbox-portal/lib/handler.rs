@@ -1,5 +1,7 @@
 //! Request handlers for the microsandbox portal JSON-RPC server.
 
+use std::sync::atomic::Ordering;
+
 use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
 use serde_json::{Value, json};
 use tracing::debug;
@@ -25,8 +27,7 @@ use crate::portal::repl::{Language, start_engines};
 pub async fn health_check_handler(
     State(state): State<SharedState>,
 ) -> Result<impl IntoResponse, PortalError> {
-    let ready = *state.ready.lock().await;
-    if ready {
+    if state.ready.load(Ordering::Acquire) {
         Ok((StatusCode::OK, "OK"))
     } else {
         Ok((StatusCode::SERVICE_UNAVAILABLE, "Not ready"))

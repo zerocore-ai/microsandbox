@@ -274,7 +274,7 @@ pub async fn forward_rpc_to_portal(
     while retry_count < MAX_RETRIES {
         // Check if portal is available and ready using the health check endpoint
         match client
-            .get(&portal_health_url)
+            .head(&portal_health_url)
             .timeout(Duration::from_millis(TIMEOUT_MS))
             .send()
             .await

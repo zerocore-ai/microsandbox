@@ -1,6 +1,6 @@
 //! Shared state management for the microsandbox portal server.
 
-use std::sync::Arc;
+use std::sync::{Arc, atomic::AtomicBool};
 use tokio::sync::Mutex;
 
 use crate::portal::{command::CommandHandle, repl::EngineHandle};
@@ -13,7 +13,7 @@ use crate::portal::{command::CommandHandle, repl::EngineHandle};
 #[derive(Clone, Debug)]
 pub struct SharedState {
     /// Indicates if the server is ready to process requests
-    pub ready: Arc<Mutex<bool>>,
+    pub ready: Arc<AtomicBool>,
 
     /// Engine handle for REPL environment
     pub engine_handle: Arc<Mutex<Option<EngineHandle>>>,
@@ -25,7 +25,7 @@ pub struct SharedState {
 impl Default for SharedState {
     fn default() -> Self {
         Self {
-            ready: Arc::new(Mutex::new(false)),
+            ready: Arc::new(AtomicBool::new(false)),
             engine_handle: Arc::new(Mutex::new(None)),
             command_handle: Arc::new(Mutex::new(None)),
         }

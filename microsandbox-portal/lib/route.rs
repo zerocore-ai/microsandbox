@@ -5,7 +5,10 @@
 //! - Router configuration and setup
 //! - Request routing and handling
 
-use axum::{routing::get, routing::post, Router};
+use axum::{
+    Router,
+    routing::{get, post},
+};
 use tower_http::trace::TraceLayer;
 
 use crate::{handler, state::SharedState};
