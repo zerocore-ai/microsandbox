@@ -48,42 +48,6 @@ const DOWNLOAD_LAYER_MSG: &str = "Download layers";
 
 pub(crate) const DOCKER_REFERENCE_TYPE_ANNOTATION: &str = "vnd.docker.reference.type";
 
-/// Normalize a registry host for consistent lookups.
-///
-/// This ensures we store and resolve credentials under the same key.
-pub fn normalize_registry_host(host: &str) -> String {
-    let mut normalized = host.trim().to_lowercase();
-
-    if let Some(stripped) = normalized.strip_prefix("https://") {
-        normalized = stripped.to_string();
-    } else if let Some(stripped) = normalized.strip_prefix("http://") {
-        normalized = stripped.to_string();
-    }
-
-    normalized = normalized.trim_end_matches('/').to_string();
-
-    if normalized == "index.docker.io" {
-        "docker.io".to_string()
-    } else {
-        normalized
-    }
-}
-
-/// Resolve the registry host for an image reference.
-pub fn registry_host_for_reference(reference: &Reference) -> String {
-    let raw = reference.to_string();
-    let mut parts = raw.split('/');
-    let first = parts.next().unwrap_or("");
-
-    let host = if first.contains('.') || first.contains(':') || first == "localhost" {
-        first.to_string()
-    } else {
-        env::get_oci_registry()
-    };
-
-    normalize_registry_host(&host)
-}
-
 /// Resolve registry auth for a given reference.
 ///
 /// Priority:
@@ -91,7 +55,11 @@ pub fn registry_host_for_reference(reference: &Reference) -> String {
 /// 2) Stored credentials (msb login)
 /// 3) Anonymous
 pub fn resolve_auth(reference: &Reference) -> MicrosandboxResult<RegistryAuth> {
-    let registry = registry_host_for_reference(reference);
+    let registry = reference
+        .registry()?
+        .host_str()
+        .ok_or_else(|| MicrosandboxError::InvalidArgument("reference missing registry host".to_string()))?
+        .to_string();
 
     let env_token = env::get_registry_token();
     let env_username = env::get_registry_username();
@@ -498,6 +466,7 @@ where
 mod tests {
     use super::*;
     use std::sync::Mutex;
+    use crate::oci::normalize_registry_host;
 
     use microsandbox_utils::{CredentialStore, StoredRegistryCredentials};
     use tempfile::TempDir;
@@ -552,8 +521,8 @@ mod tests {
     }
 
     #[test]
-    fn normalize_registry_host_maps_index_docker_io() {
-        assert_eq!(normalize_registry_host("index.docker.io"), "docker.io");
+    fn normalize_registry_host_preserves_index_docker_io() {
+        assert_eq!(normalize_registry_host("index.docker.io"), "index.docker.io");
     }
 
     #[test]

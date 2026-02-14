@@ -23,5 +23,5 @@ pub(crate) use global_cache::*;
 pub use image::*;
 pub(crate) use layer::*;
 pub use reference::*;
-pub use registry::{normalize_registry_host, registry_host_for_reference, resolve_auth};
+pub use registry::resolve_auth;
 pub(crate) use registry::*;

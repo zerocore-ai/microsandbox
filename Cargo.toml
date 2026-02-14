@@ -88,6 +88,7 @@ tracing = "0.1"
 tracing-subscriber = "0.3"
 typed-builder = "0.23"
 typed-path = "0.12"
+url = "2.5"
 uuid = { version = "1.11", features = ["v4"] }
 uzers = "0.12"
 walkdir = "2.4"
