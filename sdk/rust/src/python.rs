@@ -1,13 +1,13 @@
 //! Python-specific sandbox implementation
 
-use std::error::Error;
-use std::sync::Arc;
+use std::{error::Error, sync::Arc};
 
 use async_trait::async_trait;
 use tokio::sync::Mutex;
 
-use crate::command::Command;
-use crate::{BaseSandbox, Execution, Metrics, SandboxBase, SandboxOptions, StartOptions};
+use crate::{
+    BaseSandbox, Execution, Metrics, SandboxBase, SandboxOptions, StartOptions, command::Command,
+};
 
 /// Python-specific sandbox for executing Python code
 pub struct PythonSandbox {
@@ -82,11 +82,10 @@ impl BaseSandbox for PythonSandbox {
 
         // Get default image
         let default_image = self.get_default_image().await;
-        let image = opts.image.or_else(|| Some(default_image));
+        let image = opts.image.clone().or_else(|| Some(default_image));
 
         let mut base = self.base.lock().await;
-        base.start_sandbox(image, opts.memory, opts.cpus, opts.timeout)
-            .await
+        base.start_sandbox(image, &opts).await
     }
 
     async fn stop(&mut self) -> Result<(), Box<dyn Error + Send + Sync>> {

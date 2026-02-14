@@ -37,15 +37,15 @@ pub async fn main() -> MicrosandboxCliResult<()> {
         args.key,
         args.host,
         args.port,
-        args.namespace_dir.clone(),
+        args.project_dir.clone(),
         args.dev_mode,
     )?);
 
-    // Get namespace directory from config
-    let namespace_dir = config.get_namespace_dir().clone();
+    // Get project directory from config
+    let project_dir = config.get_project_dir().clone();
 
     // Initialize the port manager
-    let port_manager = PortManager::new(namespace_dir).await.map_err(|e| {
+    let port_manager = PortManager::new(project_dir).await.map_err(|e| {
         eprintln!("Error initializing port manager: {}", e);
         e
     })?;

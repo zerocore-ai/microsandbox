@@ -210,12 +210,12 @@ pub async fn clean(
         return Ok(());
     }
 
-    // Get sandbox namespace
-    let namespaced_name = PathBuf::from(config_file).join(sandbox_name);
+    // Get sandbox scoped name (config_file/sandbox_name)
+    let scoped_name = PathBuf::from(config_file).join(sandbox_name);
 
     // Clean up sandbox-specific directories
-    let rw_path = menv_path.join(RW_SUBDIR).join(&namespaced_name);
-    let patch_path = menv_path.join(PATCH_SUBDIR).join(&namespaced_name);
+    let rw_path = menv_path.join(RW_SUBDIR).join(&scoped_name);
+    let patch_path = menv_path.join(PATCH_SUBDIR).join(&scoped_name);
 
     // Remove sandbox directories if they exist
     if rw_path.exists() {
@@ -386,9 +386,9 @@ pub async fn show_log(
 /// let (config, _, _) = config::load_config(None::<&Path>, None).await?;
 /// menv::show_list(config.get_sandboxes());
 ///
-/// // Show all sandboxes for a specific namespace directory
-/// let namespace_path = Path::new("/path/to/namespace");
-/// let (config, _, _) = config::load_config(Some(namespace_path), None).await?;
+/// // Show all sandboxes for a specific project directory
+/// let project_path = Path::new("/path/to/project");
+/// let (config, _, _) = config::load_config(Some(project_path), None).await?;
 /// menv::show_list(config.get_sandboxes());
 /// # Ok(())
 /// # }
@@ -481,13 +481,13 @@ where
     println!("\n{}: {}", style("Total").dim(), sandboxes.len());
 }
 
-/// Show a formatted list of sandboxes across multiple namespaces
+/// Show a formatted list of sandboxes across multiple projects
 ///
-/// This function displays sandbox information from all namespaces in a consolidated view.
-/// It's useful for server mode when you want to see all sandboxes across all namespaces.
+/// This function displays sandbox information from all projects in a consolidated view.
+/// It's useful for server mode when you want to see all sandboxes across all projects.
 ///
 /// ## Arguments
-/// * `namespaces_parent_dir` - The parent directory containing namespace directories
+/// * `projects_parent_dir` - The parent directory containing project directories
 ///
 /// ## Example
 /// ```no_run
@@ -495,47 +495,45 @@ where
 /// use microsandbox_core::management::menv;
 ///
 /// # async fn example() -> anyhow::Result<()> {
-/// // Show all sandboxes across all namespaces
-/// menv::show_list_namespaces(Path::new("/path/to/namespaces")).await?;
+/// // Show all sandboxes across all projects
+/// menv::show_list_projects(Path::new("/path/to/projects")).await?;
 /// # Ok(())
 /// # }
 /// ```
 #[cfg(feature = "cli")]
-pub async fn show_list_namespaces(
-    namespaces_parent_dir: &std::path::Path,
-) -> MicrosandboxResult<()> {
+pub async fn show_list_projects(projects_parent_dir: &std::path::Path) -> MicrosandboxResult<()> {
     use crate::management::config;
     use console::style;
     use microsandbox_utils::term;
     use std::path::PathBuf;
 
-    // First check if namespaces directory exists
-    if !namespaces_parent_dir.exists() {
+    // First check if projects directory exists
+    if !projects_parent_dir.exists() {
         return Err(MicrosandboxError::PathNotFound(format!(
-            "Namespaces directory not found at {}",
-            namespaces_parent_dir.display()
+            "Projects directory not found at {}",
+            projects_parent_dir.display()
         )));
     }
 
-    // List all namespace directories
-    let mut entries = tokio::fs::read_dir(namespaces_parent_dir).await?;
-    let mut namespace_dirs = Vec::new();
+    // List all project directories
+    let mut entries = tokio::fs::read_dir(projects_parent_dir).await?;
+    let mut project_dirs = Vec::new();
 
     while let Some(entry) = entries.next_entry().await? {
         let path = entry.path();
         if path.is_dir() {
-            namespace_dirs.push(path);
+            project_dirs.push(path);
         }
     }
 
-    // Show a message if no namespaces found
-    if namespace_dirs.is_empty() {
-        println!("No namespaces found");
+    // Show a message if no projects found
+    if project_dirs.is_empty() {
+        println!("No projects found");
         return Ok(());
     }
 
-    // Sort namespace dirs alphabetically
-    namespace_dirs.sort_by(|a, b| {
+    // Sort project dirs alphabetically
+    project_dirs.sort_by(|a, b| {
         let a_name = a.file_name().and_then(|n| n.to_str()).unwrap_or("");
         let b_name = b.file_name().and_then(|n| n.to_str()).unwrap_or("");
         a_name.cmp(b_name)
@@ -543,41 +541,41 @@ pub async fn show_list_namespaces(
 
     // Create a loading spinner
     let loading_sp = term::create_spinner(
-        format!("Loading {} namespaces", namespace_dirs.len()),
+        format!("Loading {} projects", project_dirs.len()),
         None,
         None,
     );
 
-    // Pre-load all namespace configs to avoid lags between displaying each one
-    struct NamespaceData {
+    // Pre-load all project configs to avoid lags between displaying each one
+    struct ProjectData {
         name: String,
         config: Option<(crate::config::Microsandbox, PathBuf, String)>,
         error: Option<String>,
     }
 
-    let mut namespace_data = Vec::with_capacity(namespace_dirs.len());
+    let mut project_data = Vec::with_capacity(project_dirs.len());
 
-    // Collect all namespace data first
-    for namespace_dir in &namespace_dirs {
-        let namespace = namespace_dir
+    // Collect all project data first
+    for project_dir in &project_dirs {
+        let project = project_dir
             .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or("unknown")
             .to_string();
 
-        let config_result = config::load_config(Some(namespace_dir.as_path()), None).await;
+        let config_result = config::load_config(Some(project_dir.as_path()), None).await;
         match config_result {
             Ok(config) => {
-                namespace_data.push(NamespaceData {
-                    name: namespace,
+                project_data.push(ProjectData {
+                    name: project,
                     config: Some(config),
                     error: None,
                 });
             }
             Err(err) => {
-                tracing::warn!("Error loading config from namespace {}: {}", namespace, err);
-                namespace_data.push(NamespaceData {
-                    name: namespace,
+                tracing::warn!("Error loading config from project {}: {}", project, err);
+                project_data.push(ProjectData {
+                    name: project,
                     config: None,
                     error: Some(format!("{}", err)),
                 });
@@ -588,28 +586,28 @@ pub async fn show_list_namespaces(
     loading_sp.finish_and_clear();
 
     // Count totals
-    let namespace_count = namespace_dirs.len();
+    let project_count = project_dirs.len();
     let mut total_sandboxes = 0;
 
-    // Display all namespace data without delays
-    for (i, data) in namespace_data.iter().enumerate() {
-        // Add a newline between namespaces
+    // Display all project data without delays
+    for (i, data) in project_data.iter().enumerate() {
+        // Add a newline between projects
         if i > 0 {
             println!();
         }
 
         if let Some((config, _, _)) = &data.config {
-            // Count the sandboxes in this namespace
+            // Count the sandboxes in this project
             let sandbox_count = config.get_sandboxes().len();
             total_sandboxes += sandbox_count;
 
             // Only print if there are sandboxes
             if sandbox_count > 0 {
-                print_namespace_header(&data.name);
+                print_project_header(&data.name);
                 show_list(config.get_sandboxes());
             }
         } else if let Some(err) = &data.error {
-            print_namespace_header(&data.name);
+            print_project_header(&data.name);
             println!("  {}: {}", style("Error").red().bold(), err);
         }
     }
@@ -617,8 +615,8 @@ pub async fn show_list_namespaces(
     // Show summary with the captured counts
     println!(
         "\n{}: {}, {}: {}",
-        style("Total Namespaces").dim(),
-        namespace_count,
+        style("Total Projects").dim(),
+        project_count,
         style("Total Sandboxes").dim(),
         total_sandboxes
     );
@@ -626,13 +624,13 @@ pub async fn show_list_namespaces(
     Ok(())
 }
 
-/// Prints a stylized header for namespace display
+/// Prints a stylized header for project display
 #[cfg(feature = "cli")]
-pub fn print_namespace_header(namespace: &str) {
+pub fn print_project_header(project: &str) {
     use console::style;
 
     // Create the simple title text without padding
-    let title = format!("NAMESPACE: {}", namespace);
+    let title = format!("PROJECT: {}", project);
 
     // Print the title with white color and underline styling
     println!("\n{}", style(title).white().bold());

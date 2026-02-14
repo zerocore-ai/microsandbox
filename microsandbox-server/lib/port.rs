@@ -42,7 +42,7 @@ static PORT_ASSIGNMENT_LOCK: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
 /// Port mapping for sandbox instances - bidirectional for fast lookups
 #[derive(Debug, Clone, Default)]
 pub struct BiPortMapping {
-    /// Maps sandbox identifiers (namespace/sandboxname) to assigned port numbers
+    /// Maps sandbox names to assigned port numbers
     sandbox_to_port: HashMap<String, u16>,
 
     /// Maps port numbers to sandbox identifiers for fast reverse lookup
@@ -52,7 +52,7 @@ pub struct BiPortMapping {
 /// Serializable version of the port mapping for file storage
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct PortMapping {
-    /// Maps sandbox identifiers (namespace/sandboxname) to assigned port numbers
+    /// Maps sandbox names to assigned port numbers
     pub mappings: HashMap<String, u16>,
 }
 
@@ -157,8 +157,8 @@ impl BiPortMapping {
 
 impl PortManager {
     /// Create a new port manager
-    pub async fn new(namespace_dir: impl AsRef<Path>) -> MicrosandboxServerResult<Self> {
-        let file_path = namespace_dir.as_ref().join(PORTAL_PORTS_FILE);
+    pub async fn new(project_dir: impl AsRef<Path>) -> MicrosandboxServerResult<Self> {
+        let file_path = project_dir.as_ref().join(PORTAL_PORTS_FILE);
         let mappings = Self::load_mappings(&file_path).await?;
 
         Ok(Self {

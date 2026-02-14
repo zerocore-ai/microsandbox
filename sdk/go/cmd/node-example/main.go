@@ -16,7 +16,7 @@ func basicExample() {
 		msb.WithName("node-basic"),
 	)
 
-	if err := sandbox.Start("", 512, 1); err != nil {
+	if err := sandbox.Start(msb.StartConfig{Memory: 512, CPUs: 1}); err != nil {
 		log.Fatalf("Failed to start sandbox: %v", err)
 	}
 	defer func() {
@@ -62,7 +62,7 @@ func errorHandlingExample() {
 		msb.WithName("node-error"),
 	)
 
-	if err := sandbox.Start("", 512, 1); err != nil {
+	if err := sandbox.Start(msb.StartConfig{Memory: 512, CPUs: 1}); err != nil {
 		log.Fatalf("Failed to start sandbox: %v", err)
 	}
 	defer func() {
@@ -108,7 +108,7 @@ func moduleExample() {
 		msb.WithName("node-module"),
 	)
 
-	if err := sandbox.Start("", 512, 1); err != nil {
+	if err := sandbox.Start(msb.StartConfig{Memory: 512, CPUs: 1}); err != nil {
 		log.Fatalf("Failed to start sandbox: %v", err)
 	}
 	defer func() {
@@ -155,7 +155,7 @@ func executionChainingExample() {
 		msb.WithName("node-chain"),
 	)
 
-	if err := sandbox.Start("", 512, 1); err != nil {
+	if err := sandbox.Start(msb.StartConfig{Memory: 512, CPUs: 1}); err != nil {
 		log.Fatalf("Failed to start sandbox: %v", err)
 	}
 	defer func() {
@@ -202,7 +202,7 @@ func jsonAndDataExample() {
 		msb.WithName("node-json"),
 	)
 
-	if err := sandbox.Start("", 512, 1); err != nil {
+	if err := sandbox.Start(msb.StartConfig{Memory: 512, CPUs: 1}); err != nil {
 		log.Fatalf("Failed to start sandbox: %v", err)
 	}
 	defer func() {

@@ -13,7 +13,6 @@ import { SandboxOptions } from "./types";
 
 export abstract class BaseSandbox {
   protected _serverUrl: string;
-  protected _namespace: string;
   protected _name: string;
   protected _apiKey: string | undefined;
   protected _isStarted: boolean = false;
@@ -37,7 +36,6 @@ export abstract class BaseSandbox {
       options?.serverUrl ||
       process.env.MSB_SERVER_URL ||
       "http://127.0.0.1:5555";
-    this._namespace = options?.namespace || "default";
     this._name = options?.name || `sandbox-${uuidv4().substring(0, 8)}`;
     this._apiKey = options?.apiKey || process.env.MSB_API_KEY;
   }
@@ -53,7 +51,7 @@ export abstract class BaseSandbox {
    */
   protected static async createBase<T extends BaseSandbox>(
     ctor: new (options?: SandboxOptions) => T,
-    options?: SandboxOptions
+    options?: SandboxOptions,
   ): Promise<T> {
     // Try to load from .env if MSB_API_KEY is not already set
     if (!process.env.MSB_API_KEY) {
@@ -71,7 +69,7 @@ export abstract class BaseSandbox {
       options?.image,
       options?.memory,
       options?.cpus,
-      options?.timeout
+      options?.timeout,
     );
 
     return sandbox;
@@ -104,7 +102,7 @@ export abstract class BaseSandbox {
     image?: string,
     memory: number = 512,
     cpus: number = 1.0,
-    timeout: number = 180.0
+    timeout: number = 180.0,
   ): Promise<void> {
     if (this._isStarted) {
       return;
@@ -115,7 +113,6 @@ export abstract class BaseSandbox {
       jsonrpc: "2.0",
       method: "sandbox.start",
       params: {
-        namespace: this._namespace,
         sandbox: this._name,
         config: {
           image: sandboxImage,
@@ -123,7 +120,6 @@ export abstract class BaseSandbox {
           cpus: Math.round(cpus),
         },
       },
-      id: uuidv4(),
     };
 
     const headers: Record<string, string> = {
@@ -135,13 +131,10 @@ export abstract class BaseSandbox {
     }
 
     try {
-      // We don't have a client-side timeout like the Python SDK, but we can implement one if needed
-      const response = await fetch(`${this._serverUrl}/api/v1/rpc`, {
+      const response = await fetch(`${this._serverUrl}/api/v1/sandbox/start`, {
         method: "POST",
         headers,
         body: JSON.stringify(requestData),
-        // We'd need to use a more sophisticated fetch library for proper timeout handling
-        // Node-fetch doesn't have a timeout option that works the same way as Python's aiohttp
       });
 
       if (!response.ok) {
@@ -153,7 +146,7 @@ export abstract class BaseSandbox {
 
       if ("error" in responseData) {
         throw new Error(
-          `Failed to start sandbox: ${responseData.error.message}`
+          `Failed to start sandbox: ${responseData.error.message}`,
         );
       }
 
@@ -170,15 +163,15 @@ export abstract class BaseSandbox {
       if (e instanceof Error) {
         if (e.message.includes("timeout")) {
           throw new Error(
-            `Timed out waiting for sandbox to start after ${timeout} seconds`
+            `Timed out waiting for sandbox to start after ${timeout} seconds`,
           );
         }
         throw new Error(
-          `Failed to communicate with Microsandbox server: ${e.message}`
+          `Failed to communicate with Microsandbox server: ${e.message}`,
         );
       }
       throw new Error(
-        "Failed to communicate with Microsandbox server: Unknown error"
+        "Failed to communicate with Microsandbox server: Unknown error",
       );
     }
   }
@@ -197,7 +190,6 @@ export abstract class BaseSandbox {
       jsonrpc: "2.0",
       method: "sandbox.stop",
       params: {
-        namespace: this._namespace,
         sandbox: this._name,
       },
       id: uuidv4(),
@@ -212,7 +204,7 @@ export abstract class BaseSandbox {
     }
 
     try {
-      const response = await fetch(`${this._serverUrl}/api/v1/rpc`, {
+      const response = await fetch(`${this._serverUrl}/api/v1/sandbox/stop`, {
         method: "POST",
         headers,
         body: JSON.stringify(requestData),
@@ -227,7 +219,7 @@ export abstract class BaseSandbox {
 
       if ("error" in responseData) {
         throw new Error(
-          `Failed to stop sandbox: ${responseData.error.message}`
+          `Failed to stop sandbox: ${responseData.error.message}`,
         );
       }
 
@@ -235,11 +227,11 @@ export abstract class BaseSandbox {
     } catch (e) {
       if (e instanceof Error) {
         throw new Error(
-          `Failed to communicate with Microsandbox server: ${e.message}`
+          `Failed to communicate with Microsandbox server: ${e.message}`,
         );
       }
       throw new Error(
-        "Failed to communicate with Microsandbox server: Unknown error"
+        "Failed to communicate with Microsandbox server: Unknown error",
       );
     }
   }
@@ -279,13 +271,6 @@ export abstract class BaseSandbox {
    */
   get serverUrl(): string {
     return this._serverUrl;
-  }
-
-  /**
-   * Get the namespace.
-   */
-  get namespace(): string {
-    return this._namespace;
   }
 
   /**

@@ -74,9 +74,7 @@ async def all_metrics_example():
             all_metrics = await sandbox.metrics.all()
 
             # Print formatted metrics
-            print(
-                f"Sandbox: {all_metrics.get('name')} (namespace: {all_metrics.get('namespace')})"
-            )
+            print(f"Sandbox: {all_metrics.get('name')}")
             print(f"  Running: {all_metrics.get('running')}")
 
             # Handle CPU metrics which may be 0.0 or None

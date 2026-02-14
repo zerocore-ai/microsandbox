@@ -52,20 +52,15 @@ impl AppState {
     /// Get a sandbox's portal URL
     ///
     /// Returns an error if no port is assigned for the given sandbox
-    pub async fn get_portal_url_for_sandbox(
-        &self,
-        namespace: &str,
-        sandbox_name: &str,
-    ) -> ServerResult<String> {
+    pub async fn get_portal_url_for_sandbox(&self, sandbox_name: &str) -> ServerResult<String> {
         let port_manager = self.port_manager.read().await;
-        let key = format!("{}/{}", namespace, sandbox_name);
 
-        if let Some(port) = port_manager.get_port(&key) {
+        if let Some(port) = port_manager.get_port(sandbox_name) {
             Ok(format!("http://{}:{}", LOCALHOST_IP, port))
         } else {
             Err(ServerError::InternalError(format!(
                 "No portal port assigned for sandbox {}",
-                key
+                sandbox_name
             )))
         }
     }

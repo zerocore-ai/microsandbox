@@ -23,7 +23,7 @@ use microsandbox_utils::{DEFAULT_CONFIG, DEFAULT_PORTAL_GUEST_PORT, MICROSANDBOX
 use reqwest;
 use serde_json::{self, json};
 use serde_yaml;
-use std::path::PathBuf;
+use std::path::{Path as StdPath, PathBuf};
 use tokio::{
     fs as tokio_fs,
     time::{Duration, sleep, timeout},
@@ -211,47 +211,33 @@ pub async fn forward_rpc_to_portal(
 ) -> ServerResult<(StatusCode, Json<JsonRpcResponse>)> {
     // Extract sandbox information from request context or method parameters
     // The method will have the format "sandbox.repl.run" etc.
-    // The method params will have a sandbox_name and namespace parameter
+    // The method params will have a sandbox_name parameter
 
-    // Extract the sandbox and namespace from the parameters
-    let (sandbox_name, namespace) = if let Some(params) = request.params.as_object() {
-        // Get sandbox name
-        let sandbox = params
+    // Extract the sandbox name from the parameters
+    let sandbox_name = if let Some(params) = request.params.as_object() {
+        params
             .get("sandbox")
             .and_then(|v| v.as_str())
             .ok_or_else(|| {
                 ServerError::ValidationError(crate::error::ValidationError::InvalidInput(
                     "Missing required 'sandbox' parameter for portal request".to_string(),
                 ))
-            })?;
-
-        // Get namespace
-        let namespace = params
-            .get("namespace")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| {
-                ServerError::ValidationError(crate::error::ValidationError::InvalidInput(
-                    "Missing required 'namespace' parameter for portal request".to_string(),
-                ))
-            })?;
-
-        (sandbox, namespace)
+            })?
     } else {
         return Err(ServerError::ValidationError(
             crate::error::ValidationError::InvalidInput(
-                "Request parameters must be an object containing 'sandbox' and 'namespace'"
-                    .to_string(),
+                "Request parameters must be an object containing 'sandbox'".to_string(),
             ),
         ));
     };
 
     // Get the portal URL specifically for this sandbox
-    let portal_url = state
-        .get_portal_url_for_sandbox(namespace, sandbox_name)
-        .await?;
+    let portal_url = state.get_portal_url_for_sandbox(sandbox_name).await?;
 
     // Create a full URL to the portal's JSON-RPC endpoint
     let portal_rpc_url = format!("{}/api/v1/rpc", portal_url);
+    // Create a health check URL
+    let portal_health_url = format!("{}/health", portal_url);
 
     debug!("Forwarding RPC to portal: {}", portal_rpc_url);
 
@@ -270,25 +256,39 @@ pub async fn forward_rpc_to_portal(
 
     // Keep trying to connect until we succeed or hit max retries
     while retry_count < MAX_RETRIES {
-        // Check if portal is available with a HEAD request
+        // Check if portal is available and ready using the health check endpoint
         match client
-            .head(&portal_url)
+            .head(&portal_health_url)
             .timeout(Duration::from_millis(TIMEOUT_MS))
             .send()
             .await
         {
             Ok(response) => {
-                // Any HTTP response (success or error) means we successfully connected
-                debug!(
-                    "Successfully connected to portal after {} retries (status: {})",
-                    retry_count,
-                    response.status()
-                );
-                break;
+                let status = response.status();
+                if status == reqwest::StatusCode::OK {
+                    debug!(
+                        "Successfully connected to portal after {} retries (status: {})",
+                        retry_count, status
+                    );
+                    break;
+                } else if status == reqwest::StatusCode::SERVICE_UNAVAILABLE {
+                    last_error = Some(format!("Portal not ready yet (status: {})", status));
+                    trace!(
+                        "Portal not ready (attempt {}), retrying...",
+                        retry_count + 1
+                    );
+                } else {
+                    last_error = Some(format!("Portal returned error status: {}", status));
+                    trace!(
+                        "Portal connection attempt {} returned {}, retrying...",
+                        retry_count + 1,
+                        status
+                    );
+                }
             }
             Err(e) => {
                 // Track the error for potential reporting but keep retrying
-                last_error = Some(e);
+                last_error = Some(e.to_string());
                 trace!("Connection attempt {} failed, retrying...", retry_count + 1);
             }
         }
@@ -351,28 +351,22 @@ pub async fn sandbox_start_impl(
     state: AppState,
     params: SandboxStartParams,
 ) -> ServerResult<String> {
-    // Validate sandbox name and namespace
+    // Validate sandbox name
     validate_sandbox_name(&params.sandbox)?;
-    validate_namespace(&params.namespace)?;
 
-    let namespace_dir = state
-        .get_config()
-        .get_namespace_dir()
-        .join(&params.namespace);
+    let project_dir = state.get_config().get_project_dir().clone();
     let config_file = MICROSANDBOX_CONFIG_FILENAME;
-    let config_path = namespace_dir.join(config_file);
+    let config_path = project_dir.join(config_file);
     let sandbox = &params.sandbox;
 
-    // Create namespace directory if it doesn't exist
-    if !namespace_dir.exists() {
-        tokio_fs::create_dir_all(&namespace_dir)
-            .await
-            .map_err(|e| {
-                ServerError::InternalError(format!("Failed to create namespace directory: {}", e))
-            })?;
+    // Create project directory if it doesn't exist
+    if !project_dir.exists() {
+        tokio_fs::create_dir_all(&project_dir).await.map_err(|e| {
+            ServerError::InternalError(format!("Failed to create project directory: {}", e))
+        })?;
 
         // Initialize microsandbox environment
-        menv::initialize(Some(namespace_dir.clone()))
+        menv::initialize(Some(project_dir.clone()))
             .await
             .map_err(|e| {
                 ServerError::InternalError(format!(
@@ -598,7 +592,7 @@ pub async fn sandbox_start_impl(
     }
 
     // Assign a port for this sandbox
-    let sandbox_key = format!("{}/{}", params.namespace, params.sandbox);
+    let sandbox_key = params.sandbox.clone();
     let port = {
         let mut port_manager = state.get_port_manager().write().await;
         port_manager.assign_port(&sandbox_key).await.map_err(|e| {
@@ -657,7 +651,7 @@ pub async fn sandbox_start_impl(
     // Start the sandbox
     orchestra::up(
         vec![sandbox.clone()],
-        Some(&namespace_dir),
+        Some(&project_dir),
         Some(config_file),
         true,
     )
@@ -685,7 +679,7 @@ pub async fn sandbox_start_impl(
     debug!("Waiting for sandbox {} to start...", sandbox);
     match timeout(
         poll_timeout,
-        poll_sandbox_until_running(&params.sandbox, &namespace_dir, config_file),
+        poll_sandbox_until_running(&params.sandbox, &project_dir, config_file),
     )
     .await
     {
@@ -717,7 +711,7 @@ pub async fn sandbox_start_impl(
 /// Polls the sandbox until it's verified to be running
 async fn poll_sandbox_until_running(
     sandbox_name: &str,
-    namespace_dir: &std::path::Path,
+    project_dir: &StdPath,
     config_file: &str,
 ) -> ServerResult<()> {
     const POLL_INTERVAL: Duration = Duration::from_millis(20);
@@ -727,7 +721,7 @@ async fn poll_sandbox_until_running(
         // Check if the sandbox is running
         let statuses = orchestra::status(
             vec![sandbox_name.to_string()],
-            Some(namespace_dir),
+            Some(project_dir),
             Some(config_file),
         )
         .await
@@ -758,49 +752,37 @@ async fn poll_sandbox_until_running(
 
 /// Implementation for stopping a sandbox
 pub async fn sandbox_stop_impl(state: AppState, params: SandboxStopParams) -> ServerResult<String> {
-    // Validate sandbox name and namespace
+    // Validate sandbox name
     validate_sandbox_name(&params.sandbox)?;
-    validate_namespace(&params.namespace)?;
 
-    let namespace_dir = state
-        .get_config()
-        .get_namespace_dir()
-        .join(&params.namespace);
+    let project_dir = state.get_config().get_project_dir().clone();
     let config_file = MICROSANDBOX_CONFIG_FILENAME;
     let sandbox = &params.sandbox;
-    let sandbox_key = format!("{}/{}", params.namespace, params.sandbox);
+    let sandbox_key = params.sandbox.clone();
 
-    // Verify that the namespace directory exists
-    if !namespace_dir.exists() {
+    // Verify that the project directory exists
+    if !project_dir.exists() {
         return Err(ServerError::ValidationError(
-            crate::error::ValidationError::InvalidInput(format!(
-                "Namespace directory '{}' does not exist",
-                params.namespace
-            )),
+            crate::error::ValidationError::InvalidInput(
+                "Project directory does not exist".to_string(),
+            ),
         ));
     }
 
     // Verify that the config file exists
-    let config_path = namespace_dir.join(config_file);
+    let config_path = project_dir.join(config_file);
     if !config_path.exists() {
         return Err(ServerError::ValidationError(
-            crate::error::ValidationError::InvalidInput(format!(
-                "Configuration file not found for namespace '{}'",
-                params.namespace
-            )),
+            crate::error::ValidationError::InvalidInput("Configuration file not found".to_string()),
         ));
     }
 
     // Stop the sandbox using orchestra::down
-    orchestra::down(
-        vec![sandbox.clone()],
-        Some(&namespace_dir),
-        Some(config_file),
-    )
-    .await
-    .map_err(|e| {
-        ServerError::InternalError(format!("Failed to stop sandbox {}: {}", params.sandbox, e))
-    })?;
+    orchestra::down(vec![sandbox.clone()], Some(&project_dir), Some(config_file))
+        .await
+        .map_err(|e| {
+            ServerError::InternalError(format!("Failed to stop sandbox {}: {}", params.sandbox, e))
+        })?;
 
     // Release the assigned port
     {
@@ -821,119 +803,46 @@ pub async fn sandbox_get_metrics_impl(
     state: AppState,
     params: SandboxMetricsGetParams,
 ) -> ServerResult<SandboxStatusResponse> {
-    // Validate namespace - special handling for '*' wildcard
-    if params.namespace != "*" {
-        validate_namespace(&params.namespace)?;
-    }
-
     // Validate sandbox name if provided
     if let Some(sandbox) = &params.sandbox {
         validate_sandbox_name(sandbox)?;
     }
 
-    let namespaces_dir = state.get_config().get_namespace_dir();
+    let project_dir = state.get_config().get_project_dir().clone();
 
-    // Check if the namespaces directory exists
-    if !namespaces_dir.exists() {
+    // Check if the project directory exists
+    if !project_dir.exists() {
         return Err(ServerError::InternalError(format!(
-            "Namespaces directory '{}' does not exist",
-            namespaces_dir.display()
+            "Project directory '{}' does not exist",
+            project_dir.display()
         )));
     }
 
-    // Get all sandboxes metrics based on the request
+    // Get metrics filtered by sandbox name if provided
+    let sandbox_names = if let Some(sandbox) = &params.sandbox {
+        vec![sandbox.clone()]
+    } else {
+        vec![]
+    };
+
     let mut all_statuses = Vec::new();
 
-    // If namespace is "*", get metrics from all namespaces
-    if params.namespace == "*" {
-        // Read namespaces directory
-        let mut entries = tokio::fs::read_dir(&namespaces_dir).await.map_err(|e| {
-            ServerError::InternalError(format!("Failed to read namespaces directory: {}", e))
-        })?;
-
-        // Process each namespace directory
-        while let Some(entry) = entries.next_entry().await.map_err(|e| {
-            ServerError::InternalError(format!("Failed to read namespace directory entry: {}", e))
-        })? {
-            let path = entry.path();
-            if !path.is_dir() {
-                continue;
-            }
-
-            let namespace = path
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or("unknown")
-                .to_string();
-
-            // Get metrics for this namespace, filtered by sandbox name if provided
-            let sandbox_names = if let Some(sandbox) = &params.sandbox {
-                vec![sandbox.clone()]
-            } else {
-                vec![]
-            };
-
-            match orchestra::status(sandbox_names, Some(&path), None).await {
-                Ok(statuses) => {
-                    for status in statuses {
-                        // Convert from orchestra::SandboxStatus to our SandboxStatus
-                        all_statuses.push(SandboxStatus {
-                            namespace: namespace.clone(),
-                            name: status.name,
-                            running: status.running,
-                            cpu_usage: status.cpu_usage,
-                            memory_usage: status.memory_usage,
-                            disk_usage: status.disk_usage,
-                        });
-                    }
-                }
-                Err(e) => {
-                    // Log the error but continue with other namespaces
-                    tracing::warn!("Error getting metrics for namespace {}: {}", namespace, e);
-                }
+    match orchestra::status(sandbox_names, Some(&project_dir), None).await {
+        Ok(statuses) => {
+            for status in statuses {
+                all_statuses.push(SandboxStatus {
+                    name: status.name,
+                    running: status.running,
+                    cpu_usage: status.cpu_usage,
+                    memory_usage: status.memory_usage,
+                    disk_usage: status.disk_usage,
+                });
             }
         }
-    } else {
-        // Get metrics for a specific namespace
-        let namespace_dir = namespaces_dir.join(&params.namespace);
-
-        // Check if the namespace directory exists
-        if !namespace_dir.exists() {
-            return Err(ServerError::ValidationError(
-                crate::error::ValidationError::InvalidInput(format!(
-                    "Namespace directory '{}' does not exist",
-                    params.namespace
-                )),
-            ));
-        }
-
-        // Get metrics for this namespace, filtered by sandbox name if provided
-        let sandbox_names = if let Some(sandbox) = &params.sandbox {
-            vec![sandbox.clone()]
-        } else {
-            vec![]
-        };
-
-        match orchestra::status(sandbox_names, Some(&namespace_dir), None).await {
-            Ok(statuses) => {
-                for status in statuses {
-                    // Convert from orchestra::SandboxStatus to our SandboxStatus
-                    all_statuses.push(SandboxStatus {
-                        namespace: params.namespace.clone(),
-                        name: status.name,
-                        running: status.running,
-                        cpu_usage: status.cpu_usage,
-                        memory_usage: status.memory_usage,
-                        disk_usage: status.disk_usage,
-                    });
-                }
-            }
-            Err(e) => {
-                return Err(ServerError::InternalError(format!(
-                    "Error getting metrics for namespace {}: {}",
-                    params.namespace, e
-                )));
-            }
+        Err(e) => {
+            return Err(ServerError::InternalError(format!(
+                "Error getting metrics: {e}"
+            )));
         }
     }
 
@@ -949,7 +858,7 @@ pub async fn sandbox_get_metrics_impl(
 /// Handler for proxy requests
 pub async fn proxy_request(
     State(_state): State<AppState>,
-    Path((namespace, sandbox, path)): Path<(String, String, PathBuf)>,
+    Path((sandbox, path)): Path<(String, PathBuf)>,
     req: Request<Body>,
 ) -> ServerResult<impl IntoResponse> {
     // In a real implementation, this would use the middleware::proxy_uri function
@@ -959,14 +868,13 @@ pub async fn proxy_request(
 
     // Calculate target URI using our middleware function
     let original_uri = req.uri().clone();
-    let _target_uri = middleware::proxy_uri(original_uri, &namespace, &sandbox);
+    let _target_uri = middleware::proxy_uri(original_uri, &sandbox);
 
     // In a production system, this handler would forward the request to the target URI
     // For now, we'll just return information about what would be proxied
 
     let response = format!(
-        "Axum Proxy Request\n\nNamespace: {}\nSandbox: {}\nPath: {}\nMethod: {}\nHeaders: {:?}",
-        namespace,
+        "Axum Proxy Request\n\nSandbox: {}\nPath: {}\nMethod: {}\nHeaders: {:?}",
         sandbox,
         path_str,
         req.method(),
@@ -1027,58 +935,6 @@ fn validate_sandbox_name(name: &str) -> ServerResult<()> {
         return Err(ServerError::ValidationError(
             crate::error::ValidationError::InvalidInput(
                 "Sandbox name must start with an alphanumeric character".to_string(),
-            ),
-        ));
-    }
-
-    Ok(())
-}
-
-/// Validates a namespace
-fn validate_namespace(namespace: &str) -> ServerResult<()> {
-    // Check namespace length
-    if namespace.is_empty() {
-        return Err(ServerError::ValidationError(
-            crate::error::ValidationError::InvalidInput("Namespace cannot be empty".to_string()),
-        ));
-    }
-
-    if namespace.len() > 63 {
-        return Err(ServerError::ValidationError(
-            crate::error::ValidationError::InvalidInput(
-                "Namespace cannot exceed 63 characters".to_string(),
-            ),
-        ));
-    }
-
-    // Check for wildcard namespace - only valid for queries, not for creation
-    if namespace == "*" {
-        return Err(ServerError::ValidationError(
-            crate::error::ValidationError::InvalidInput(
-                "Wildcard namespace (*) is not valid for sandbox creation".to_string(),
-            ),
-        ));
-    }
-
-    // Check namespace characters
-    let valid_chars = namespace
-        .chars()
-        .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
-
-    if !valid_chars {
-        return Err(ServerError::ValidationError(
-            crate::error::ValidationError::InvalidInput(
-                "Namespace can only contain alphanumeric characters, hyphens, or underscores"
-                    .to_string(),
-            ),
-        ));
-    }
-
-    // Must start with an alphanumeric character
-    if !namespace.chars().next().unwrap().is_ascii_alphanumeric() {
-        return Err(ServerError::ValidationError(
-            crate::error::ValidationError::InvalidInput(
-                "Namespace must start with an alphanumeric character".to_string(),
             ),
         ));
     }
