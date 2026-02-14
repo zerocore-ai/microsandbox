@@ -1,6 +1,6 @@
 use std::sync::Mutex;
 
-use microsandbox_core::{oci::Reference, oci::resolve_registry_auth};
+use microsandbox_core::{oci::Reference, oci::resolve_auth};
 use microsandbox_utils::{
     StoredRegistryCredentials, clear_registry_credentials, env, store_registry_credentials,
 };
@@ -56,8 +56,8 @@ fn resolves_stored_credentials_when_env_missing() {
     )
     .expect("store");
 
-    let reference: Reference = "ghcr.io/aurial-rocks/python313:0.1.2".parse().unwrap();
-    let auth = resolve_registry_auth(&reference).expect("resolve auth");
+    let reference: Reference = "ghcr.io/org/app:1.0".parse().unwrap();
+    let auth = resolve_auth(&reference).expect("resolve auth");
     assert!(matches!(auth, oci_client::secrets::RegistryAuth::Bearer(t) if t == "stored-token"));
 }
 
@@ -79,7 +79,7 @@ fn env_overrides_stored_credentials() {
     )
     .expect("store");
 
-    let reference: Reference = "ghcr.io/aurial-rocks/python313:0.1.2".parse().unwrap();
-    let auth = resolve_registry_auth(&reference).expect("resolve auth");
+    let reference: Reference = "ghcr.io/org/app:1.0".parse().unwrap();
+    let auth = resolve_auth(&reference).expect("resolve auth");
     assert!(matches!(auth, oci_client::secrets::RegistryAuth::Bearer(t) if t == "env-token"));
 }
