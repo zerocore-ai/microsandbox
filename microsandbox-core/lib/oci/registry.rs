@@ -48,6 +48,58 @@ const DOWNLOAD_LAYER_MSG: &str = "Download layers";
 
 pub(crate) const DOCKER_REFERENCE_TYPE_ANNOTATION: &str = "vnd.docker.reference.type";
 
+enum ParsedCredentials {
+    Present(StoredRegistryCredentials),
+    Missing,
+    Incomplete,
+}
+
+fn parse_credential_inputs(
+    input_username: Option<String>,
+    input_password: Option<String>,
+    input_token: Option<String>,
+) -> MicrosandboxResult<ParsedCredentials> {
+    if input_token.is_some() && (input_username.is_some() || input_password.is_some()) {
+        return Err(MicrosandboxError::InvalidArgument(
+            "token cannot be combined with username/password".to_string(),
+        ));
+    }
+
+    if let Some(token) = input_token {
+        return Ok(ParsedCredentials::Present(
+            StoredRegistryCredentials::Token { token },
+        ));
+    }
+
+    match (input_username, input_password) {
+        (Some(username), Some(password)) => Ok(ParsedCredentials::Present(
+            StoredRegistryCredentials::Basic { username, password },
+        )),
+        (None, None) => Ok(ParsedCredentials::Missing),
+        _ => Ok(ParsedCredentials::Incomplete),
+    }
+}
+
+/// Resolve explicit registry credentials from user-provided inputs only.
+///
+/// This function does not read environment variables nor stored credentials.
+pub fn resolve_explicit_credentials(
+    username: Option<String>,
+    password: Option<String>,
+    token: Option<String>,
+) -> MicrosandboxResult<StoredRegistryCredentials> {
+    match parse_credential_inputs(username, password, token)? {
+        ParsedCredentials::Present(credentials) => Ok(credentials),
+        ParsedCredentials::Missing => Err(MicrosandboxError::InvalidArgument(
+            "no credentials provided; explicitly pass --token or --username with --password-stdin"
+                .to_string(),
+        )),
+        ParsedCredentials::Incomplete => Err(MicrosandboxError::InvalidArgument(
+            "both username and password are required".to_string(),
+        )),
+    }
+}
+
 /// Resolve registry auth for a given reference.
 ///
 /// Priority:
@@ -61,42 +113,36 @@ pub fn resolve_auth(reference: &Reference) -> MicrosandboxResult<RegistryAuth> {
         .ok_or_else(|| MicrosandboxError::InvalidArgument("reference missing registry host".to_string()))?
         .to_string();
 
-    let env_token = env::get_registry_token();
-    let env_username = env::get_registry_username();
-    let env_password = env::get_registry_password();
-
-    if env_token.is_some() && (env_username.is_some() || env_password.is_some()) {
-        return Err(MicrosandboxError::InvalidArgument(
-            "token cannot be combined with username/password".to_string(),
-        ));
-    }
-
-    if let Some(token) = env_token {
-        return Ok(RegistryAuth::Bearer(token));
-    }
-
-    match (env_username, env_password) {
-        (Some(username), Some(password)) => {
-            return Ok(RegistryAuth::Basic(username, password));
+    match parse_credential_inputs(
+        env::get_registry_username(),
+        env::get_registry_password(),
+        env::get_registry_token(),
+    )? {
+        ParsedCredentials::Present(credentials) => {
+            return Ok(stored_to_registry_auth(credentials));
         }
-        (Some(_), None) | (None, Some(_)) => {
+        ParsedCredentials::Incomplete => {
             tracing::warn!(
                 "registry credentials provided via env are incomplete; falling back to stored or anonymous"
             );
         }
-        (None, None) => {}
+        ParsedCredentials::Missing => {}
     }
 
     if let Some(stored) = CredentialStore::load_stored_registry_credentials(&registry)? {
-        return Ok(match stored {
-            StoredRegistryCredentials::Basic { username, password } => {
-                RegistryAuth::Basic(username, password)
-            }
-            StoredRegistryCredentials::Token { token } => RegistryAuth::Bearer(token),
-        });
+        return Ok(stored_to_registry_auth(stored));
     }
 
     Ok(RegistryAuth::Anonymous)
+}
+
+fn stored_to_registry_auth(stored: StoredRegistryCredentials) -> RegistryAuth {
+    match stored {
+        StoredRegistryCredentials::Basic { username, password } => {
+            RegistryAuth::Basic(username, password)
+        }
+        StoredRegistryCredentials::Token { token } => RegistryAuth::Bearer(token),
+    }
 }
 
 /// Registry is an abstraction over the logic for fetching images from a registry,
@@ -528,6 +574,30 @@ mod tests {
     #[test]
     fn normalize_registry_host_strips_scheme_and_slash() {
         assert_eq!(normalize_registry_host("https://Docker.IO/"), "docker.io");
+    }
+
+    #[test]
+    fn resolve_explicit_credentials_prefers_token() {
+        let auth = resolve_explicit_credentials(None, None, Some("token-123".to_string())).unwrap();
+        assert!(matches!(
+            auth,
+            StoredRegistryCredentials::Token { token } if token == "token-123"
+        ));
+    }
+
+    #[test]
+    fn resolve_explicit_credentials_accepts_basic() {
+        let auth = resolve_explicit_credentials(
+            Some("user".to_string()),
+            Some("pass".to_string()),
+            None,
+        )
+        .unwrap();
+        assert!(matches!(
+            auth,
+            StoredRegistryCredentials::Basic { username, password }
+                if username == "user" && password == "pass"
+        ));
     }
 
     #[test]
