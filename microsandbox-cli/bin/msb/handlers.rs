@@ -450,10 +450,7 @@ pub async fn server_ssh_subcommand(
 pub async fn self_subcommand(action: SelfAction) -> MicrosandboxCliResult<()> {
     match action {
         SelfAction::Upgrade => {
-            println!(
-                "{} upgrade functionality is not yet implemented",
-                "error:".error()
-            );
+            tracing::error!("upgrade functionality is not yet implemented");
             return Ok(());
         }
         SelfAction::Uninstall => {
@@ -675,6 +672,11 @@ pub async fn server_status_subcommand(
     Ok(())
 }
 
+/// Handle `msb login` by resolving credentials and persisting them for a registry.
+///
+/// The registry is resolved from CLI input first, then environment defaults.
+/// Credentials can come from CLI flags or environment variables and are stored
+/// without remote validation.
 pub async fn login_subcommand(
     registry: Option<String>,
     username: Option<String>,
@@ -694,19 +696,24 @@ pub async fn login_subcommand(
 
     store_registry_credentials(&registry, stored_credentials)
         .map_err(|err| MicrosandboxCliError::ConfigError(err.to_string()))?;
-    println!(
-        "info: {} saved for registry {} (not validated)",
-        saved_message, registry
+    tracing::info!(
+        "{} saved for registry {} (not validated)",
+        saved_message,
+        registry
     );
 
     Ok(())
 }
 
+/// Handle `msb logout` by removing stored registry credentials.
+///
+/// When `all` is `true`, all saved registry credentials are removed.
+/// Otherwise, only credentials for the resolved registry host are deleted.
 pub async fn logout_subcommand(registry: Option<String>, all: bool) -> MicrosandboxCliResult<()> {
     if all {
         clear_registry_credentials()
             .map_err(|err| MicrosandboxCliError::ConfigError(err.to_string()))?;
-        println!("info: cleared all stored registry credentials");
+        tracing::info!("cleared all stored registry credentials");
         return Ok(());
     }
 
@@ -714,22 +721,16 @@ pub async fn logout_subcommand(registry: Option<String>, all: bool) -> Microsand
     let removed = remove_registry_credentials(&registry)
         .map_err(|err| MicrosandboxCliError::ConfigError(err.to_string()))?;
     if removed {
-        println!("info: removed stored credentials for registry {}", registry);
+        tracing::info!("removed stored credentials for registry {}", registry);
     } else {
-        println!(
-            "info: no stored credentials found for registry {}",
-            registry
-        );
+        tracing::info!("no stored credentials found for registry {}", registry);
     }
 
     Ok(())
 }
 
 pub async fn push_subcommand(_image: bool, _name: String) -> MicrosandboxCliResult<()> {
-    println!(
-        "{} push functionality is not yet implemented",
-        "error:".error()
-    );
+    tracing::error!("push functionality is not yet implemented");
     Ok(())
 }
 
@@ -796,6 +797,10 @@ enum LoginCredentials {
     Token { token: String },
 }
 
+/// Resolve the effective registry host from CLI and environment configuration.
+///
+/// Resolution order is: explicit `registry` argument, `MSB_REGISTRY_HOST`,
+/// then the default OCI registry. The returned host is normalized.
 fn resolve_registry_host(registry: Option<String>) -> String {
     let host = registry
         .or_else(env::get_registry_host)
@@ -804,6 +809,11 @@ fn resolve_registry_host(registry: Option<String>) -> String {
     normalize_registry_host(&host)
 }
 
+/// Resolve login credentials from CLI flags with environment fallback.
+///
+/// CLI credentials are validated first. If CLI input is present but invalid,
+/// resolution falls back to environment variables. Token-based and
+/// username/password-based authentication is mutually exclusive.
 async fn resolve_login_credentials(
     username: Option<String>,
     password_stdin: bool,
@@ -870,6 +880,9 @@ async fn resolve_login_credentials(
     }
 }
 
+/// Read a password from stdin and trim trailing newlines.
+///
+/// Returns an error when stdin is empty after trimming.
 async fn read_password_from_stdin() -> MicrosandboxCliResult<String> {
     let mut input = String::new();
     let mut stdin = io::stdin();
