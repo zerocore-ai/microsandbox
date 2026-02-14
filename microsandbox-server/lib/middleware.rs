@@ -12,19 +12,18 @@
 //! - Logging and tracing middleware
 
 use axum::{
-    body::{Body, to_bytes},
+    body::Body,
     extract::State,
     http::{HeaderMap, Request, StatusCode, Uri},
     middleware::Next,
     response::IntoResponse,
 };
 use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode};
-use serde_json::Value;
 
 use crate::{
     Claims,
     config::PROXY_AUTH_HEADER,
-    error::{AuthenticationError, ServerError, ValidationError},
+    error::{AuthenticationError, ServerError},
     management::API_KEY_PREFIX,
     state::AppState,
 };
@@ -45,7 +44,7 @@ pub async fn proxy_middleware(
 }
 
 /// Convert a URI to a proxied URI targeting a sandbox
-pub fn proxy_uri(original_uri: Uri, namespace: &str, sandbox_name: &str) -> Uri {
+pub fn proxy_uri(original_uri: Uri, sandbox_name: &str) -> Uri {
     // In a real implementation, you would:
     // 1. Look up the sandbox's address from a registry or state
     // 2. Construct a new URI that points to the sandbox
@@ -53,7 +52,7 @@ pub fn proxy_uri(original_uri: Uri, namespace: &str, sandbox_name: &str) -> Uri 
 
     // For demonstration purposes, we'll construct a simple URI
     // In production, you would get this from a sandbox registry
-    let target_host = format!("sandbox-{}.{}.internal", sandbox_name, namespace);
+    let target_host = format!("sandbox-{}.internal", sandbox_name);
 
     let uri_string = if let Some(path_and_query) = original_uri.path_and_query() {
         format!("http://{}:{}{}", target_host, 8080, path_and_query)
@@ -88,7 +87,7 @@ pub async fn logging_middleware(
     Ok(response)
 }
 
-/// Authentication middleware for verifying API keys and namespace access
+/// Authentication middleware for verifying API keys
 pub async fn auth_middleware(
     State(state): State<AppState>,
     req: Request<Body>,
@@ -102,47 +101,15 @@ pub async fn auth_middleware(
     // Extract API key from authorization header
     let api_key = extract_api_key_from_headers(req.headers())?;
 
-    // Validate the token and get its claims
-    let claims = validate_token(&api_key, &state)?;
-
-    // If token has wildcard namespace access, we can skip further namespace validation
-    if claims.namespace == "*" {
-        return Ok(next.run(req).await);
-    }
-
-    // For namespace-specific tokens, we need to ensure the token has access to the requested namespace
-    // We need to read the request body to extract the namespace
-    let (parts, body) = req.into_parts();
-
-    // Use axum's to_bytes to buffer the body
-    let bytes = to_bytes(body, usize::MAX)
-        .await
-        .map_err(|e| ServerError::InternalError(format!("Failed to read request body: {}", e)))?;
-
-    // Parse the JSON-RPC request and extract the namespace
-    let namespace_from_request = extract_namespace_from_json_rpc(&bytes)?;
-
-    // Validate that the token has access to the requested namespace
-    if claims.namespace != namespace_from_request {
-        return Err(ServerError::AuthorizationError(
-            crate::error::AuthorizationError::AccessDenied(format!(
-                "Token does not have access to namespace '{}'",
-                namespace_from_request
-            )),
-        ));
-    }
-
-    // Reconstruct the request with the original body
-    let body = Body::from(bytes);
-    let req = Request::from_parts(parts, body);
+    // Validate the token
+    validate_token(&api_key, &state)?;
 
     // If everything is valid, continue with the request
     Ok(next.run(req).await)
 }
 
-/// Smart authentication middleware for MCP requests that handles protocol vs tool methods differently
-/// Protocol methods (initialize, tools/list, prompts/list, prompts/get) don't require namespace validation
-/// Tool methods (tools/call) require namespace validation
+/// Smart authentication middleware for MCP requests
+/// All methods require valid token authentication
 pub async fn mcp_smart_auth_middleware(
     State(state): State<AppState>,
     req: Request<Body>,
@@ -156,57 +123,8 @@ pub async fn mcp_smart_auth_middleware(
     // Extract API key from authorization header
     let api_key = extract_api_key_from_headers(req.headers())?;
 
-    // Validate the token and get its claims
-    let claims = validate_token(&api_key, &state)?;
-
-    // If token has wildcard namespace access, we can skip further namespace validation
-    if claims.namespace == "*" {
-        return Ok(next.run(req).await);
-    }
-
-    // For namespace-specific tokens, we need to check if this is a tool execution method
-    // that requires namespace validation
-    let (parts, body) = req.into_parts();
-
-    // Use axum's to_bytes to buffer the body
-    let bytes = to_bytes(body, usize::MAX)
-        .await
-        .map_err(|e| ServerError::InternalError(format!("Failed to read request body: {}", e)))?;
-
-    // Parse the JSON to check the method
-    let json_value: serde_json::Value = serde_json::from_slice(&bytes).map_err(|e| {
-        ServerError::ValidationError(crate::error::ValidationError::InvalidInput(format!(
-            "Invalid JSON-RPC request: {}",
-            e
-        )))
-    })?;
-
-    let method = json_value
-        .get("method")
-        .and_then(serde_json::Value::as_str)
-        .unwrap_or("unknown");
-
-    // Check if this is a tool execution method that requires namespace validation
-    let requires_namespace_validation = matches!(method, "tools/call");
-
-    if requires_namespace_validation {
-        // Extract namespace from params for tool execution methods
-        let namespace_from_request = extract_namespace_from_json_rpc(&bytes)?;
-
-        // Validate that the token has access to the requested namespace
-        if claims.namespace != namespace_from_request {
-            return Err(ServerError::AuthorizationError(
-                crate::error::AuthorizationError::AccessDenied(format!(
-                    "Token does not have access to namespace '{}'",
-                    namespace_from_request
-                )),
-            ));
-        }
-    }
-
-    // Reconstruct the request with the original body
-    let body = Body::from(bytes);
-    let req = Request::from_parts(parts, body);
+    // Validate the token
+    validate_token(&api_key, &state)?;
 
     // If everything is valid, continue with the request
     Ok(next.run(req).await)
@@ -215,42 +133,6 @@ pub async fn mcp_smart_auth_middleware(
 //--------------------------------------------------------------------------------------------------
 // Helper Functions
 //--------------------------------------------------------------------------------------------------
-
-/// Extract the namespace from a JSON-RPC request body
-fn extract_namespace_from_json_rpc(bytes: &[u8]) -> Result<String, ServerError> {
-    // Parse the request body as JSON
-    let json_value: Value = serde_json::from_slice(bytes).map_err(|e| {
-        ServerError::ValidationError(ValidationError::InvalidInput(format!(
-            "Invalid JSON-RPC request: {}",
-            e
-        )))
-    })?;
-
-    // Extract the method for logging purposes
-    let method = json_value
-        .get("method")
-        .and_then(Value::as_str)
-        .unwrap_or("unknown");
-
-    // Extract params object
-    let params = json_value.get("params").ok_or_else(|| {
-        ServerError::ValidationError(ValidationError::InvalidInput(
-            "Missing 'params' field in JSON-RPC request".to_string(),
-        ))
-    })?;
-
-    // Extract namespace from params for any method
-    params
-        .get("namespace")
-        .and_then(Value::as_str)
-        .map(String::from)
-        .ok_or_else(|| {
-            ServerError::ValidationError(ValidationError::InvalidInput(format!(
-                "Missing or invalid 'namespace' in params for method '{}'",
-                method
-            )))
-        })
-}
 
 /// Extract API key from request headers
 fn extract_api_key_from_headers(headers: &HeaderMap) -> Result<String, ServerError> {
@@ -348,26 +230,4 @@ fn validate_token(api_key: &str, state: &AppState) -> Result<Claims, ServerError
     })?;
 
     Ok(token_data.claims)
-}
-
-/// Validate the token and check namespace access
-pub fn validate_token_and_namespace(
-    api_key: &str,
-    requested_namespace: &str,
-    state: &AppState,
-) -> Result<Claims, ServerError> {
-    // Validate token
-    let claims = validate_token(api_key, state)?;
-
-    // Check if the token's namespace matches the requested namespace
-    if claims.namespace != requested_namespace && claims.namespace != "*" {
-        return Err(ServerError::Authentication(
-            AuthenticationError::InvalidCredentials(format!(
-                "Token does not have access to namespace '{}'",
-                requested_namespace
-            )),
-        ));
-    }
-
-    Ok(claims)
 }

@@ -7,7 +7,7 @@ import os
 import uuid
 from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
-from typing import Optional
+from typing import Dict, List, Optional
 
 import aiohttp
 from dotenv import load_dotenv
@@ -27,7 +27,6 @@ class BaseSandbox(ABC):
     def __init__(
         self,
         server_url: str = None,
-        namespace: str = "default",
         name: Optional[str] = None,
         api_key: Optional[str] = None,
     ):
@@ -36,7 +35,6 @@ class BaseSandbox(ABC):
 
         Args:
             server_url: URL of the Microsandbox server. If not provided, will check MSB_SERVER_URL environment variable, then fall back to default.
-            namespace: Namespace for the sandbox
             name: Optional name for the sandbox. If not provided, a random name will be generated.
             api_key: API key for Microsandbox server authentication. If not provided, it will be read from MSB_API_KEY environment variable.
         """
@@ -51,7 +49,6 @@ class BaseSandbox(ABC):
         self._server_url = server_url or os.environ.get(
             "MSB_SERVER_URL", "http://127.0.0.1:5555"
         )
-        self._namespace = namespace
         self._name = name or f"sandbox-{uuid.uuid4().hex[:8]}"
         self._api_key = api_key or os.environ.get("MSB_API_KEY")
         self._session = None
@@ -72,7 +69,6 @@ class BaseSandbox(ABC):
     async def create(
         cls,
         server_url: str = None,
-        namespace: str = "default",
         name: Optional[str] = None,
         api_key: Optional[str] = None,
     ):
@@ -81,7 +77,6 @@ class BaseSandbox(ABC):
 
         Args:
             server_url: URL of the Microsandbox server. If not provided, will check MSB_SERVER_URL environment variable, then fall back to default.
-            namespace: Namespace for the sandbox
             name: Optional name for the sandbox. If not provided, a random name will be generated.
             api_key: API key for Microsandbox server authentication. If not provided, it will be read from MSB_API_KEY environment variable.
 
@@ -98,7 +93,6 @@ class BaseSandbox(ABC):
 
         sandbox = cls(
             server_url=server_url,
-            namespace=namespace,
             name=name,
             api_key=api_key,
         )
@@ -121,6 +115,14 @@ class BaseSandbox(ABC):
         image: Optional[str] = None,
         memory: int = 512,
         cpus: float = 1.0,
+        volumes: Optional[List[str]] = None,
+        ports: Optional[List[str]] = None,
+        envs: Optional[List[str]] = None,
+        depends_on: Optional[List[str]] = None,
+        workdir: Optional[str] = None,
+        shell: Optional[str] = None,
+        scripts: Optional[Dict[str, str]] = None,
+        exec: Optional[str] = None,
         timeout: float = 180.0,
     ) -> None:
         """
@@ -130,6 +132,14 @@ class BaseSandbox(ABC):
             image: Docker image to use for the sandbox (defaults to language-specific image)
             memory: Memory limit in MB
             cpus: CPU limit (will be rounded to nearest integer)
+            volumes: Volumes to mount
+            ports: Ports to expose
+            envs: Environment variables to use
+            depends_on: Sandboxes to depend on
+            workdir: Working directory to use
+            shell: Shell to use
+            scripts: Scripts that can be run
+            exec: Exec command to run
             timeout: Maximum time in seconds to wait for the sandbox to start (default: 180 seconds)
 
         Raises:
@@ -140,19 +150,35 @@ class BaseSandbox(ABC):
             return
 
         sandbox_image = image or await self.get_default_image()
+        config = {
+            "image": sandbox_image,
+            "memory": memory,
+            "cpus": int(round(cpus)),
+        }
+        if volumes is not None:
+            config["volumes"] = volumes
+        if ports is not None:
+            config["ports"] = ports
+        if envs is not None:
+            config["envs"] = envs
+        if depends_on is not None:
+            config["depends_on"] = depends_on
+        if workdir is not None:
+            config["workdir"] = workdir
+        if shell is not None:
+            config["shell"] = shell
+        if scripts is not None:
+            config["scripts"] = scripts
+        if exec is not None:
+            config["exec"] = exec
+
         request_data = {
             "jsonrpc": "2.0",
             "method": "sandbox.start",
             "params": {
-                "namespace": self._namespace,
                 "sandbox": self._name,
-                "config": {
-                    "image": sandbox_image,
-                    "memory": memory,
-                    "cpus": int(round(cpus)),
-                },
+                "config": config,
             },
-            "id": str(uuid.uuid4()),
         }
 
         headers = {"Content-Type": "application/json"}
@@ -165,7 +191,7 @@ class BaseSandbox(ABC):
             client_timeout = aiohttp.ClientTimeout(total=timeout + 30)
 
             async with self._session.post(
-                f"{self._server_url}/api/v1/rpc",
+                f"{self._server_url}/api/v1/sandbox/start",
                 json=request_data,
                 headers=headers,
                 timeout=client_timeout,
@@ -175,19 +201,15 @@ class BaseSandbox(ABC):
                     raise RuntimeError(f"Failed to start sandbox: {error_text}")
 
                 response_data = await response.json()
-                if "error" in response_data:
-                    raise RuntimeError(
-                        f"Failed to start sandbox: {response_data['error']['message']}"
-                    )
 
-                # Check the result message - it might indicate the sandbox is still initializing
-                result = response_data.get("result", "")
-                if isinstance(result, str) and "timed out waiting" in result:
+                # Check the message - it might indicate the sandbox is still initializing
+                message = response_data.get("message", "")
+                if isinstance(message, str) and "timed out waiting" in message:
                     # Server timed out but still started the sandbox
                     # We'll raise a warning but still consider it started
                     import warnings
 
-                    warnings.warn(f"Sandbox start warning: {result}")
+                    warnings.warn(f"Sandbox start warning: {message}")
 
                 self._is_started = True
         except aiohttp.ClientError as e:
@@ -210,7 +232,7 @@ class BaseSandbox(ABC):
         request_data = {
             "jsonrpc": "2.0",
             "method": "sandbox.stop",
-            "params": {"namespace": self._namespace, "sandbox": self._name},
+            "params": {"sandbox": self._name},
             "id": str(uuid.uuid4()),
         }
 
@@ -220,19 +242,13 @@ class BaseSandbox(ABC):
 
         try:
             async with self._session.post(
-                f"{self._server_url}/api/v1/rpc",
+                f"{self._server_url}/api/v1/sandbox/stop",
                 json=request_data,
                 headers=headers,
             ) as response:
                 if response.status != 200:
                     error_text = await response.text()
                     raise RuntimeError(f"Failed to stop sandbox: {error_text}")
-
-                response_data = await response.json()
-                if "error" in response_data:
-                    raise RuntimeError(
-                        f"Failed to stop sandbox: {response_data['error']['message']}"
-                    )
 
                 self._is_started = False
         except aiohttp.ClientError as e:

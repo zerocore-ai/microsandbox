@@ -66,9 +66,6 @@ pub static DEFAULT_MSBSERVER_EXE_PATH: LazyLock<PathBuf> = LazyLock::new(|| {
 /// The default working directory for the sandbox.
 pub const DEFAULT_WORKDIR: &str = "/";
 
-/// The default namespace for the sandbox server.
-pub const DEFAULT_SERVER_NAMESPACE: &str = "default";
-
 /// The default localhost address.
 pub const DEFAULT_SERVER_HOST: &str = "127.0.0.1";
 

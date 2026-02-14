@@ -86,10 +86,6 @@ pub async fn handle_mcp_list_tools(
                             "type": "string",
                             "description": "Name of the sandbox to start"
                         },
-                        "namespace": {
-                            "type": "string",
-                            "description": "Namespace for the sandbox"
-                        },
                         "config": {
                             "type": "object",
                             "description": "Sandbox configuration",
@@ -125,7 +121,7 @@ pub async fn handle_mcp_list_tools(
                             }
                         }
                     },
-                    "required": ["sandbox", "namespace"]
+                    "required": ["sandbox"]
                 }
             },
             {
@@ -137,13 +133,9 @@ pub async fn handle_mcp_list_tools(
                         "sandbox": {
                             "type": "string",
                             "description": "Name of the sandbox to stop"
-                        },
-                        "namespace": {
-                            "type": "string",
-                            "description": "Namespace of the sandbox"
                         }
                     },
-                    "required": ["sandbox", "namespace"]
+                    "required": ["sandbox"]
                 }
             },
             {
@@ -156,10 +148,6 @@ pub async fn handle_mcp_list_tools(
                             "type": "string",
                             "description": "Name of the sandbox (must be already started)"
                         },
-                        "namespace": {
-                            "type": "string",
-                            "description": "Namespace of the sandbox"
-                        },
                         "code": {
                             "type": "string",
                             "description": "Code to execute"
@@ -169,7 +157,7 @@ pub async fn handle_mcp_list_tools(
                             "description": "Programming language (e.g., 'python', 'nodejs')"
                         }
                     },
-                    "required": ["sandbox", "namespace", "code", "language"]
+                    "required": ["sandbox", "code", "language"]
                 }
             },
             {
@@ -182,10 +170,6 @@ pub async fn handle_mcp_list_tools(
                             "type": "string",
                             "description": "Name of the sandbox (must be already started)"
                         },
-                        "namespace": {
-                            "type": "string",
-                            "description": "Namespace of the sandbox"
-                        },
                         "command": {
                             "type": "string",
                             "description": "Command to execute"
@@ -196,7 +180,7 @@ pub async fn handle_mcp_list_tools(
                             "description": "Command arguments"
                         }
                     },
-                    "required": ["sandbox", "namespace", "command"]
+                    "required": ["sandbox", "command"]
                 }
             },
             {
@@ -208,13 +192,9 @@ pub async fn handle_mcp_list_tools(
                         "sandbox": {
                             "type": "string",
                             "description": "Optional specific sandbox name to get metrics for"
-                        },
-                        "namespace": {
-                            "type": "string",
-                            "description": "Namespace to query (use '*' for all namespaces)"
                         }
                     },
-                    "required": ["namespace"]
+                    "required": []
                 }
             }
         ]
@@ -240,11 +220,6 @@ pub async fn handle_mcp_list_prompts(
                         "name": "sandbox_name",
                         "description": "Name for the new sandbox",
                         "required": true
-                    },
-                    {
-                        "name": "namespace",
-                        "description": "Namespace for the sandbox",
-                        "required": true
                     }
                 ]
             },
@@ -255,11 +230,6 @@ pub async fn handle_mcp_list_prompts(
                     {
                         "name": "sandbox_name",
                         "description": "Name for the new sandbox",
-                        "required": true
-                    },
-                    {
-                        "name": "namespace",
-                        "description": "Namespace for the sandbox",
                         "required": true
                     }
                 ]
@@ -297,10 +267,6 @@ pub async fn handle_mcp_get_prompt(
                 .and_then(|args| args.get("sandbox_name"))
                 .and_then(|v| v.as_str())
                 .unwrap_or("python-sandbox");
-            let namespace = arguments
-                .and_then(|args| args.get("namespace"))
-                .and_then(|v| v.as_str())
-                .unwrap_or("default");
 
             json!({
                 "description": "Create a Python development sandbox",
@@ -310,13 +276,13 @@ pub async fn handle_mcp_get_prompt(
                         "content": {
                             "type": "text",
                             "text": format!(
-                                "Create a Python sandbox named '{}' in namespace '{}' using the sandbox_start tool with the following configuration:\n\n\
+                                "Create a Python sandbox named '{}' using the sandbox_start tool with the following configuration:\n\n\
                                 - Image: microsandbox/python\n\
                                 - Memory: 512 MiB\n\
                                 - CPUs: 1\n\
                                 - Working directory: /workspace\n\n\
                                 This will set up a Python development environment ready for code execution.",
-                                sandbox_name, namespace
+                                sandbox_name
                             )
                         }
                     }
@@ -328,10 +294,6 @@ pub async fn handle_mcp_get_prompt(
                 .and_then(|args| args.get("sandbox_name"))
                 .and_then(|v| v.as_str())
                 .unwrap_or("node-sandbox");
-            let namespace = arguments
-                .and_then(|args| args.get("namespace"))
-                .and_then(|v| v.as_str())
-                .unwrap_or("default");
 
             json!({
                 "description": "Create a Node.js development sandbox",
@@ -341,13 +303,13 @@ pub async fn handle_mcp_get_prompt(
                         "content": {
                             "type": "text",
                             "text": format!(
-                                "Create a Node.js sandbox named '{}' in namespace '{}' using the sandbox_start tool with the following configuration:\n\n\
+                                "Create a Node.js sandbox named '{}' using the sandbox_start tool with the following configuration:\n\n\
                                 - Image: microsandbox/node\n\
                                 - Memory: 512 MiB\n\
                                 - CPUs: 1\n\
                                 - Working directory: /workspace\n\n\
                                 This will set up a Node.js development environment ready for JavaScript execution.",
-                                sandbox_name, namespace
+                                sandbox_name
                             )
                         }
                     }

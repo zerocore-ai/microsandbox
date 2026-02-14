@@ -5,7 +5,10 @@
 //! - Router configuration and setup
 //! - Request routing and handling
 
-use axum::{Router, routing::post};
+use axum::{
+    Router,
+    routing::{get, post},
+};
 use tower_http::trace::TraceLayer;
 
 use crate::{handler, state::SharedState};
@@ -22,6 +25,7 @@ pub fn create_router(state: SharedState) -> Router {
 
     // Combine all routes with tracing middleware
     Router::new()
+        .route("/health", get(handler::health_check_handler))
         .nest("/api/v1/rpc", rpc_api)
         .layer(TraceLayer::new_for_http())
         .with_state(state)

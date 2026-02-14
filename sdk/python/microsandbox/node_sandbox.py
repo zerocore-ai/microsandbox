@@ -49,7 +49,6 @@ class NodeSandbox(BaseSandbox):
             "method": "sandbox.repl.run",
             "params": {
                 "sandbox": self._name,
-                "namespace": self._namespace,
                 "language": "nodejs",
                 "code": code,
             },

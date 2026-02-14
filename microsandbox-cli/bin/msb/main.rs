@@ -209,7 +209,7 @@ async fn main() -> MicrosandboxCliResult<()> {
             ServerSubcommand::Start {
                 host,
                 port,
-                namespace_dir,
+                project_dir,
                 dev_mode,
                 key,
                 detach,
@@ -218,7 +218,7 @@ async fn main() -> MicrosandboxCliResult<()> {
                 handlers::server_start_subcommand(
                     host,
                     port,
-                    namespace_dir,
+                    project_dir,
                     dev_mode,
                     key,
                     detach,
@@ -229,34 +229,25 @@ async fn main() -> MicrosandboxCliResult<()> {
             ServerSubcommand::Stop => {
                 handlers::server_stop_subcommand().await?;
             }
-            ServerSubcommand::Keygen { expire, namespace } => {
-                handlers::server_keygen_subcommand(expire, namespace).await?;
+            ServerSubcommand::Keygen { expire } => {
+                handlers::server_keygen_subcommand(expire).await?;
             }
             ServerSubcommand::Log {
                 sandbox,
                 name,
-                namespace,
                 follow,
                 tail,
             } => {
-                handlers::server_log_subcommand(sandbox, name, namespace, follow, tail).await?;
+                handlers::server_log_subcommand(sandbox, name, follow, tail).await?;
             }
-            ServerSubcommand::List { namespace } => {
-                handlers::server_list_subcommand(namespace).await?;
+            ServerSubcommand::List => {
+                handlers::server_list_subcommand().await?;
             }
-            ServerSubcommand::Status {
-                sandbox,
-                names,
-                namespace,
-            } => {
-                handlers::server_status_subcommand(sandbox, names, namespace).await?;
+            ServerSubcommand::Status { sandbox, names } => {
+                handlers::server_status_subcommand(sandbox, names).await?;
             }
-            ServerSubcommand::Ssh {
-                namespace,
-                sandbox,
-                name,
-            } => {
-                handlers::server_ssh_subcommand(namespace, sandbox, name).await?;
+            ServerSubcommand::Ssh { sandbox, name } => {
+                handlers::server_ssh_subcommand(sandbox, name).await?;
             }
         },
         Some(MicrosandboxSubcommand::Login) => {

@@ -77,10 +77,10 @@ pub const MICROSANDBOX_CONFIG_FILENAME: &str = "Sandboxfile";
 /// Example: <PROJECT_ROOT>/<MICROSANDBOX_ENV_DIR>/<PATCH_SUBDIR>/<CONFIG_NAME>/<SHELL_SCRIPT_NAME>
 pub const SHELL_SCRIPT_NAME: &str = "shell";
 
-/// The directory where namespaces are stored
+/// The directory where projects are stored
 ///
-/// Example: <MICROSANDBOX_HOME_DIR>/<NAMESPACES_SUBDIR>
-pub const NAMESPACES_SUBDIR: &str = "namespaces";
+/// Example: <MICROSANDBOX_HOME_DIR>/<PROJECTS_SUBDIR>
+pub const PROJECTS_SUBDIR: &str = "projects";
 
 /// The PID file for the server
 ///
@@ -94,7 +94,7 @@ pub const SERVER_KEY_FILE: &str = "server.key";
 
 /// The file where sandbox portal ports are stored
 ///
-/// Example: <MICROSANDBOX_HOME_DIR>/<NAMESPACE_SUBDIR>/<PORTAL_PORTS_FILE>
+/// Example: <MICROSANDBOX_HOME_DIR>/<PROJECTS_SUBDIR>/<PORTAL_PORTS_FILE>
 pub const PORTAL_PORTS_FILE: &str = "portal.ports";
 
 /// The XDG home directory

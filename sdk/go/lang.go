@@ -9,7 +9,7 @@ import "errors"
 // Example usage:
 //
 //	sandbox := msb.NewPythonSandbox(msb.WithName("my-sandbox"))
-//	if err := sandbox.Start("", 512, 1); err != nil {
+//	if err := sandbox.Start(msb.StartConfig{Memory: 512, CPUs: 1}); err != nil {
 //		log.Fatal(err)
 //	}
 //	defer sandbox.Stop()
@@ -68,11 +68,11 @@ func newLangSandbox(lang progLang, options ...Option) *langSandbox {
 	return n
 }
 
-func (ls *langSandbox) Start(image string, memoryMB int, cpus int) error {
-	if image == "" {
-		image = ls.l.DefaultImage()
+func (ls *langSandbox) Start(cfg StartConfig) error {
+	if cfg.Image == "" {
+		cfg.Image = ls.l.DefaultImage()
 	}
-	return starter{ls.b}.Start(image, memoryMB, cpus)
+	return starter{ls.b}.Start(cfg)
 }
 
 func (ls *langSandbox) Stop() error {

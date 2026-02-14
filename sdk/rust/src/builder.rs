@@ -6,9 +6,6 @@ pub struct SandboxOptions {
     /// URL of the Microsandbox server
     pub(crate) server_url: Option<String>,
 
-    /// Namespace for the sandbox
-    pub(crate) namespace: Option<String>,
-
     /// Name of the sandbox
     pub(crate) name: Option<String>,
 
@@ -20,7 +17,6 @@ pub struct SandboxOptions {
 #[derive(Debug, Clone, Default)]
 pub struct SandboxOptionsBuilder {
     server_url: Option<String>,
-    namespace: Option<String>,
     name: Option<String>,
     api_key: Option<String>,
 }
@@ -36,12 +32,6 @@ impl SandboxOptionsBuilder {
     /// Set the server URL
     pub fn server_url(mut self, url: impl Into<String>) -> Self {
         self.server_url = Some(url.into());
-        self
-    }
-
-    /// Set the namespace
-    pub fn namespace(mut self, namespace: impl Into<String>) -> Self {
-        self.namespace = Some(namespace.into());
         self
     }
 
@@ -61,7 +51,6 @@ impl SandboxOptionsBuilder {
     pub fn build(self) -> SandboxOptions {
         SandboxOptions {
             server_url: self.server_url,
-            namespace: self.namespace,
             name: self.name,
             api_key: self.api_key,
         }

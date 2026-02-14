@@ -60,7 +60,6 @@ class Command:
             "method": "sandbox.command.run",
             "params": {
                 "sandbox": self._sandbox._name,
-                "namespace": self._sandbox._namespace,
                 "command": command,
                 "args": args,
             },

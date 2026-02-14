@@ -19,7 +19,7 @@ use jsonwebtoken::{EncodingKey, Header};
 #[cfg(feature = "cli")]
 use microsandbox_utils::term;
 use microsandbox_utils::{
-    DEFAULT_MSBSERVER_EXE_PATH, MSBSERVER_EXE_ENV_VAR, NAMESPACES_SUBDIR, SERVER_KEY_FILE,
+    DEFAULT_MSBSERVER_EXE_PATH, MSBSERVER_EXE_ENV_VAR, PROJECTS_SUBDIR, SERVER_KEY_FILE,
     SERVER_PID_FILE, env,
 };
 use rand::{Rng, distr::Alphanumeric};
@@ -59,9 +59,6 @@ pub struct Claims {
 
     /// Issued at time
     pub iat: u64,
-
-    /// Namespace
-    pub namespace: String,
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -73,7 +70,7 @@ pub async fn start(
     key: Option<String>,
     host: Option<String>,
     port: Option<u16>,
-    namespace_dir: Option<PathBuf>,
+    project_dir: Option<PathBuf>,
     dev_mode: bool,
     detach: bool,
     reset_key: bool,
@@ -82,9 +79,9 @@ pub async fn start(
     let microsandbox_home_path = env::get_microsandbox_home_path();
     fs::create_dir_all(&microsandbox_home_path).await?;
 
-    // Ensure namespace directory exists
-    let namespace_path = microsandbox_home_path.join(NAMESPACES_SUBDIR);
-    fs::create_dir_all(&namespace_path).await?;
+    // Ensure project directory exists
+    let project_path = microsandbox_home_path.join(PROJECTS_SUBDIR);
+    fs::create_dir_all(&project_path).await?;
 
     #[cfg(feature = "cli")]
     let start_server_sp = term::create_spinner(START_SERVER_MSG.to_string(), None, None);
@@ -151,8 +148,8 @@ pub async fn start(
         command.arg("--port").arg(port.to_string());
     }
 
-    if let Some(namespace_dir) = namespace_dir {
-        command.arg("--path").arg(namespace_dir);
+    if let Some(project_dir) = project_dir {
+        command.arg("--path").arg(project_dir);
     }
 
     // Handle secure non-dev mode
@@ -409,10 +406,7 @@ pub async fn stop() -> MicrosandboxServerResult<()> {
 }
 
 /// Generate a new API key (JWT token)
-pub async fn keygen(
-    expire: Option<Duration>,
-    namespace: String,
-) -> MicrosandboxServerResult<String> {
+pub async fn keygen(expire: Option<Duration>) -> MicrosandboxServerResult<String> {
     let microsandbox_home_path = env::get_microsandbox_home_path();
     let key_file_path = microsandbox_home_path.join(SERVER_KEY_FILE);
 
@@ -452,7 +446,6 @@ pub async fn keygen(
     let claims = Claims {
         exp: expiry.timestamp() as u64,
         iat: now.timestamp() as u64,
-        namespace,
     };
 
     // Encode the token
@@ -478,17 +471,12 @@ pub async fn keygen(
     #[cfg(feature = "cli")]
     keygen_sp.finish();
 
-    tracing::info!(
-        "Generated API token with namespace {} and expiry {}",
-        claims.namespace,
-        expiry_str
-    );
+    tracing::info!("Generated API token with expiry {}", expiry_str);
 
     #[cfg(feature = "cli")]
     {
         println!("Token: {}", console::style(&token_str).cyan());
         println!("Token expires: {}", console::style(&expiry_str).cyan());
-        println!("Namespace: {}", console::style(&claims.namespace).cyan());
     }
 
     Ok(token_str)

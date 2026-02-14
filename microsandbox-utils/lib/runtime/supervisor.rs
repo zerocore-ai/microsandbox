@@ -230,19 +230,12 @@ where
 
                 if let Some(pid) = self.child_pid.take()
                     && let Err(e) = nix::sys::signal::kill(Pid::from_raw(pid as i32), nix::sys::signal::Signal::SIGTERM) {
-                    tracing::error!(
-                        "failed to send SIGTERM to process {}: {}",
-                        pid,
-                        e
-                    );
+                    tracing::error!("failed to send SIGTERM to process {pid}: {e}");
                 }
 
                 // Wait for child to exit after sending signal
                 if let Err(e) = child.wait().await {
-                    tracing::error!(
-                        "error waiting for child after SIGTERM: {}",
-                        e
-                    );
+                    tracing::error!("error waiting for child after SIGTERM: {e}");
                 }
             }
             _ = sigint.recv() => {
@@ -253,19 +246,12 @@ where
 
                 if let Some(pid) = self.child_pid.take()
                     && let Err(e) = nix::sys::signal::kill(Pid::from_raw(pid as i32), nix::sys::signal::Signal::SIGTERM) {
-                    tracing::error!(
-                        "failed to send SIGTERM to process {}: {}",
-                        pid,
-                        e
-                    );
+                    tracing::error!("failed to send SIGTERM to process {pid}: {e}");
                 }
 
                 // Wait for child to exit after sending signal
                 if let Err(e) = child.wait().await {
-                    tracing::error!(
-                        "error waiting for child after SIGINT: {}",
-                        e
-                    );
+                    tracing::error!("error waiting for child after SIGINT: {e}");
                 }
             }
         }

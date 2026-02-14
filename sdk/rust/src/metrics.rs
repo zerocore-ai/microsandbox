@@ -1,5 +1,4 @@
-use std::error::Error;
-use std::sync::Arc;
+use std::{error::Error, sync::Arc};
 
 use serde_json::json;
 use tokio::sync::Mutex;
@@ -32,11 +31,10 @@ impl Metrics {
         }
 
         // Extract sandbox details
-        let (server_url, namespace, sandbox_name, api_key) = {
+        let (server_url, sandbox_name, api_key) = {
             let base = self.base.lock().await;
             (
                 base.server_url.clone(),
-                base.namespace.clone(),
                 base.name.clone(),
                 base.api_key.clone(),
             )
@@ -48,7 +46,6 @@ impl Metrics {
             "jsonrpc": "2.0",
             "method": "sandbox.metrics.get",
             "params": {
-                "namespace": namespace,
                 "sandbox": sandbox_name,
             },
             "id": request_id,
@@ -130,7 +127,6 @@ impl Metrics {
     /// ```json
     /// {
     ///   "name": "sandbox-name",
-    ///   "namespace": "namespace",
     ///   "running": true,
     ///   "cpu_usage": 0.5,
     ///   "memory_usage": 128,

@@ -22,14 +22,6 @@ func WithServerUrl(serverUrl string) Option {
 	}
 }
 
-// WithNamespace configures the sandbox namespace for isolation.
-// If not specified, uses the default namespace.
-func WithNamespace(namespace string) Option {
-	return func(msb *baseMicroSandbox) {
-		msb.cfg.namespace = namespace
-	}
-}
-
 // WithName sets a custom name for the sandbox instance.
 // If not specified, a random name will be generated.
 func WithName(name string) Option {
@@ -80,9 +72,6 @@ func fillDefaultConfigs() Option {
 			} else {
 				msb.cfg.serverUrl = defaultServerUrl
 			}
-		}
-		if msb.cfg.namespace == "" {
-			msb.cfg.namespace = defaultNamespace
 		}
 		if msb.cfg.name == "" {
 			b := make([]byte, 4) // 4 bytes == 8 hex chars

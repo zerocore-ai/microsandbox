@@ -11,7 +11,7 @@ use microsandbox_core::{
     oci::Reference,
 };
 use microsandbox_server::MicrosandboxServerResult;
-use microsandbox_utils::{NAMESPACES_SUBDIR, env};
+use microsandbox_utils::{PROJECTS_SUBDIR, env};
 use std::{collections::HashMap, path::PathBuf};
 use typed_path::Utf8UnixPathBuf;
 
@@ -393,13 +393,13 @@ pub async fn clean_subcommand(
 pub async fn server_start_subcommand(
     host: Option<String>,
     port: Option<u16>,
-    namespace_dir: Option<PathBuf>,
+    project_dir: Option<PathBuf>,
     dev_mode: bool,
     key: Option<String>,
     detach: bool,
     reset_key: bool,
 ) -> MicrosandboxCliResult<()> {
-    microsandbox_server::start(key, host, port, namespace_dir, dev_mode, detach, reset_key).await?;
+    microsandbox_server::start(key, host, port, project_dir, dev_mode, detach, reset_key).await?;
     Ok(())
 }
 
@@ -408,10 +408,7 @@ pub async fn server_stop_subcommand() -> MicrosandboxServerResult<()> {
     Ok(())
 }
 
-pub async fn server_keygen_subcommand(
-    expire: Option<String>,
-    namespace: Option<String>,
-) -> MicrosandboxCliResult<()> {
+pub async fn server_keygen_subcommand(expire: Option<String>) -> MicrosandboxCliResult<()> {
     // Convert the string duration to chrono::Duration
     let duration = if let Some(expire_str) = expire {
         Some(parse_duration_string(&expire_str)?)
@@ -419,20 +416,13 @@ pub async fn server_keygen_subcommand(
         None
     };
 
-    // If namespace is None, use "*" to represent all namespaces
-    let namespace_value = namespace.unwrap_or_else(|| "*".to_string());
-
-    microsandbox_server::keygen(duration, namespace_value).await?;
+    microsandbox_server::keygen(duration).await?;
 
     Ok(())
 }
 
 /// Handles the server ssh subcommand, which spawns a new SSH session into a sandbox
-pub async fn server_ssh_subcommand(
-    _namespace: String,
-    _sandbox: bool,
-    _name: String,
-) -> MicrosandboxCliResult<()> {
+pub async fn server_ssh_subcommand(_sandbox: bool, _name: String) -> MicrosandboxCliResult<()> {
     MicrosandboxArgs::command()
         .override_usage(usage("ssh", Some("[NAME]"), None))
         .error(
@@ -555,69 +545,47 @@ pub async fn uninstall_subcommand(script: Option<String>) -> MicrosandboxCliResu
 pub async fn server_log_subcommand(
     _sandbox: bool,
     name: String,
-    namespace: String,
     follow: bool,
     tail: Option<usize>,
 ) -> MicrosandboxCliResult<()> {
-    // Ensure microsandbox home directory exists
-    let namespace_path = env::get_microsandbox_home_path()
-        .join(NAMESPACES_SUBDIR)
-        .join(&namespace);
+    // Use the project directory
+    let project_path = env::get_microsandbox_home_path().join(PROJECTS_SUBDIR);
 
-    if !namespace_path.exists() {
-        return Err(MicrosandboxCliError::NotFound(format!(
-            "Namespace '{}' not found",
-            namespace
-        )));
+    if !project_path.exists() {
+        return Err(MicrosandboxCliError::NotFound(
+            "Project directory not found".to_string(),
+        ));
     }
 
     // Reuse the same log viewing functionality
-    menv::show_log(Some(namespace_path), None, &name, follow, tail).await?;
+    menv::show_log(Some(project_path), None, &name, follow, tail).await?;
 
     Ok(())
 }
 
-pub async fn server_list_subcommand(namespace: Option<String>) -> MicrosandboxCliResult<()> {
-    // Get the microsandbox home path
+pub async fn server_list_subcommand() -> MicrosandboxCliResult<()> {
+    // Get the project directory
     let microsandbox_home_path = env::get_microsandbox_home_path();
-    let namespaces_path = microsandbox_home_path.join(NAMESPACES_SUBDIR);
+    let project_path = microsandbox_home_path.join(PROJECTS_SUBDIR);
 
-    // Check if we need to show all namespaces or just one
-    if let Some(namespace) = namespace {
-        // Single namespace mode
-        let namespace_path = namespaces_path.join(&namespace);
+    if !project_path.exists() {
+        return Err(MicrosandboxCliError::NotFound(
+            "Project directory not found".to_string(),
+        ));
+    }
 
-        if !namespace_path.exists() {
-            return Err(MicrosandboxCliError::NotFound(format!(
-                "Namespace '{}' not found",
-                namespace
+    // Load configuration from the project directory
+    let config_result = config::load_config(Some(project_path.as_path()), None).await;
+    match config_result {
+        Ok((config, _, _)) => {
+            // Use the common show_list function to display sandboxes
+            menv::show_list(config.get_sandboxes());
+        }
+        Err(err) => {
+            return Err(MicrosandboxCliError::ConfigError(format!(
+                "Failed to load configuration: {}",
+                err
             )));
-        }
-
-        // Load configuration from the namespace directory
-        let config_result = config::load_config(Some(namespace_path.as_path()), None).await;
-        match config_result {
-            Ok((config, _, _)) => {
-                // Use the common show_list function to display sandboxes
-                menv::show_list(config.get_sandboxes());
-            }
-            Err(err) => {
-                return Err(MicrosandboxCliError::ConfigError(format!(
-                    "Failed to load configuration from namespace '{}': {}",
-                    namespace, err
-                )));
-            }
-        }
-    } else {
-        // All namespaces mode - use the dedicated function
-        match menv::show_list_namespaces(namespaces_path.as_path()).await {
-            Ok(_) => (),
-            Err(err) => {
-                return Err(MicrosandboxCliError::NamespaceError(format!(
-                    "Failed to list namespaces: {}",
-                    err
-                )));
-            }
         }
     }
 
@@ -627,46 +595,18 @@ pub async fn server_list_subcommand(namespace: Option<String>) -> MicrosandboxCl
 pub async fn server_status_subcommand(
     _sandbox: bool,
     names: Vec<String>,
-    namespace: Option<String>,
 ) -> MicrosandboxCliResult<()> {
-    // Get the microsandbox home path
+    // Get the project directory
     let microsandbox_home_path = env::get_microsandbox_home_path();
-    let namespaces_path = microsandbox_home_path.join(NAMESPACES_SUBDIR);
+    let project_path = microsandbox_home_path.join(PROJECTS_SUBDIR);
 
-    // Check if we need to show all namespaces or just one
-    if let Some(namespace) = namespace {
-        // Single namespace mode
-        let namespace_path = namespaces_path.join(&namespace);
-
-        if !namespace_path.exists() {
-            return Err(MicrosandboxCliError::NotFound(format!(
-                "Namespace '{}' not found",
-                namespace
-            )));
-        }
-
-        orchestra::show_status(&names, Some(namespace_path.as_path()), None).await?;
-    } else {
-        // All namespaces mode
-        // First check if namespaces directory exists
-        if !namespaces_path.exists() {
-            return Err(MicrosandboxCliError::NotFound(
-                "No namespaces directory found".to_string(),
-            ));
-        }
-
-        // Show status for all namespaces, passing the parent directory
-        // instead of a pre-collected list of namespace directories
-        match orchestra::show_status_namespaces(&names, namespaces_path.as_path()).await {
-            Ok(_) => (),
-            Err(err) => {
-                return Err(MicrosandboxCliError::NamespaceError(format!(
-                    "Failed to show namespace statuses: {}",
-                    err
-                )));
-            }
-        }
+    if !project_path.exists() {
+        return Err(MicrosandboxCliError::NotFound(
+            "Project directory not found".to_string(),
+        ));
     }
+
+    orchestra::show_status(&names, Some(project_path.as_path()), None).await?;
 
     Ok(())
 }
