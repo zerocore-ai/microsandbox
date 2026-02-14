@@ -20,7 +20,7 @@ use tokio::{
     io::AsyncWriteExt,
 };
 
-use microsandbox_utils::{StoredRegistryCredentials, env, load_stored_registry_credentials};
+use microsandbox_utils::{CredentialStore, StoredRegistryCredentials, env};
 
 use crate::{
     MicrosandboxError, MicrosandboxResult,
@@ -119,7 +119,7 @@ pub fn resolve_auth(reference: &Reference) -> MicrosandboxResult<RegistryAuth> {
         (None, None) => {}
     }
 
-    if let Some(stored) = load_stored_registry_credentials(&registry)? {
+    if let Some(stored) = CredentialStore::load_stored_registry_credentials(&registry)? {
         return Ok(match stored {
             StoredRegistryCredentials::Basic { username, password } => {
                 RegistryAuth::Basic(username, password)
@@ -499,9 +499,7 @@ mod tests {
     use super::*;
     use std::sync::Mutex;
 
-    use microsandbox_utils::{
-        StoredRegistryCredentials, clear_registry_credentials, store_registry_credentials,
-    };
+    use microsandbox_utils::{CredentialStore, StoredRegistryCredentials};
     use tempfile::TempDir;
 
     static ENV_LOCK: Mutex<()> = Mutex::new(());
@@ -555,8 +553,8 @@ mod tests {
 
         let msb_home = TempDir::new().expect("temp msb home");
         let _msb_home = EnvGuard::set(env::MICROSANDBOX_HOME_ENV_VAR, msb_home.path());
-        clear_registry_credentials().expect("clear");
-        store_registry_credentials(
+        CredentialStore::clear_registry_credentials().expect("clear");
+        CredentialStore::store_registry_credentials(
             "ghcr.io",
             StoredRegistryCredentials::Token {
                 token: "stored-token".to_string(),
@@ -578,8 +576,8 @@ mod tests {
 
         let msb_home = TempDir::new().expect("temp msb home");
         let _msb_home = EnvGuard::set(env::MICROSANDBOX_HOME_ENV_VAR, msb_home.path());
-        clear_registry_credentials().expect("clear");
-        store_registry_credentials(
+        CredentialStore::clear_registry_credentials().expect("clear");
+        CredentialStore::store_registry_credentials(
             "ghcr.io",
             StoredRegistryCredentials::Token {
                 token: "stored-token".to_string(),
@@ -601,8 +599,8 @@ mod tests {
 
         let msb_home = TempDir::new().expect("temp msb home");
         let _msb_home = EnvGuard::set(env::MICROSANDBOX_HOME_ENV_VAR, msb_home.path());
-        clear_registry_credentials().expect("clear");
-        store_registry_credentials(
+        CredentialStore::clear_registry_credentials().expect("clear");
+        CredentialStore::store_registry_credentials(
             "ghcr.io",
             StoredRegistryCredentials::Token {
                 token: "stored-token".to_string(),
@@ -624,7 +622,7 @@ mod tests {
 
         let msb_home = TempDir::new().expect("temp msb home");
         let _msb_home = EnvGuard::set(env::MICROSANDBOX_HOME_ENV_VAR, msb_home.path());
-        clear_registry_credentials().expect("clear");
+        CredentialStore::clear_registry_credentials().expect("clear");
 
         let reference: Reference = "ghcr.io/org/app:1.0".parse().unwrap();
         let auth = resolve_auth(&reference).expect("resolve auth");
@@ -640,7 +638,7 @@ mod tests {
 
         let msb_home = TempDir::new().expect("temp msb home");
         let _msb_home = EnvGuard::set(env::MICROSANDBOX_HOME_ENV_VAR, msb_home.path());
-        clear_registry_credentials().expect("clear");
+        CredentialStore::clear_registry_credentials().expect("clear");
 
         let reference: Reference = "ghcr.io/org/app:1.0".parse().unwrap();
         let err = resolve_auth(&reference).expect_err("expected error");

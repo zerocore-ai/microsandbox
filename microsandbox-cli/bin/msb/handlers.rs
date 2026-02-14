@@ -12,8 +12,7 @@ use microsandbox_core::{
 };
 use microsandbox_server::MicrosandboxServerResult;
 use microsandbox_utils::{
-    NAMESPACES_SUBDIR, StoredRegistryCredentials, clear_registry_credentials, env,
-    remove_registry_credentials, store_registry_credentials,
+    CredentialStore, NAMESPACES_SUBDIR, StoredRegistryCredentials, env,
 };
 use std::{collections::HashMap, path::PathBuf};
 use tokio::io::{self, AsyncReadExt};
@@ -694,7 +693,7 @@ pub async fn login_subcommand(
         LoginCredentials::Token { token } => (StoredRegistryCredentials::Token { token }, "token"),
     };
 
-    store_registry_credentials(&registry, stored_credentials)
+    CredentialStore::store_registry_credentials(&registry, stored_credentials)
         .map_err(|err| MicrosandboxCliError::ConfigError(err.to_string()))?;
     tracing::info!(
         "{} saved for registry {} (not validated)",
@@ -711,14 +710,14 @@ pub async fn login_subcommand(
 /// Otherwise, only credentials for the resolved registry host are deleted.
 pub async fn logout_subcommand(registry: Option<String>, all: bool) -> MicrosandboxCliResult<()> {
     if all {
-        clear_registry_credentials()
+        CredentialStore::clear_registry_credentials()
             .map_err(|err| MicrosandboxCliError::ConfigError(err.to_string()))?;
         tracing::info!("cleared all stored registry credentials");
         return Ok(());
     }
 
     let registry = resolve_registry_host(registry);
-    let removed = remove_registry_credentials(&registry)
+    let removed = CredentialStore::remove_registry_credentials(&registry)
         .map_err(|err| MicrosandboxCliError::ConfigError(err.to_string()))?;
     if removed {
         tracing::info!("removed stored credentials for registry {}", registry);

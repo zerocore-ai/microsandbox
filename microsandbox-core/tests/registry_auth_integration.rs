@@ -2,7 +2,7 @@ use std::sync::Mutex;
 
 use microsandbox_core::{oci::Reference, oci::resolve_auth};
 use microsandbox_utils::{
-    StoredRegistryCredentials, clear_registry_credentials, env, store_registry_credentials,
+    CredentialStore, StoredRegistryCredentials, env,
 };
 use tempfile::TempDir;
 
@@ -47,8 +47,8 @@ fn resolves_stored_credentials_when_env_missing() {
 
     let msb_home = TempDir::new().expect("temp msb home");
     let _msb_home = EnvGuard::set(env::MICROSANDBOX_HOME_ENV_VAR, msb_home.path());
-    clear_registry_credentials().expect("clear");
-    store_registry_credentials(
+    CredentialStore::clear_registry_credentials().expect("clear");
+    CredentialStore::store_registry_credentials(
         "ghcr.io",
         StoredRegistryCredentials::Token {
             token: "stored-token".to_string(),
@@ -70,8 +70,8 @@ fn env_overrides_stored_credentials() {
 
     let msb_home = TempDir::new().expect("temp msb home");
     let _msb_home = EnvGuard::set(env::MICROSANDBOX_HOME_ENV_VAR, msb_home.path());
-    clear_registry_credentials().expect("clear");
-    store_registry_credentials(
+    CredentialStore::clear_registry_credentials().expect("clear");
+    CredentialStore::store_registry_credentials(
         "ghcr.io",
         StoredRegistryCredentials::Token {
             token: "stored-token".to_string(),
