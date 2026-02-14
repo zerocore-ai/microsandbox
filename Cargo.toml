@@ -41,6 +41,7 @@ futures = "0.3"
 getset = "0.1"
 hex = "0.4"
 indicatif = "0.18"
+keyring = "3.6"
 intaglio = "1.10"
 ipnetwork = { version = "0.21.0", features = ["serde"] }
 jsonwebtoken = "9.3"

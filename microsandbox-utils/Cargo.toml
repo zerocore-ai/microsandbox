@@ -19,6 +19,7 @@ console.workspace = true
 dirs.workspace = true
 futures.workspace = true
 indicatif.workspace = true
+keyring.workspace = true
 libc.workspace = true
 nix = { workspace = true, features = ["fs", "process", "signal", "term"] }
 pretty-error-debug.workspace = true
