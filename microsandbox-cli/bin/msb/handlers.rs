@@ -8,14 +8,14 @@ use microsandbox_core::{
         config::{self, Component, ComponentType, SandboxConfig},
         home, menv, orchestra, sandbox, toolchain,
     },
-    oci::{Reference, normalize_registry_host},
+    oci::{Reference, normalize_registry_host, resolve_explicit_credentials},
 };
 use microsandbox_server::MicrosandboxServerResult;
 use microsandbox_utils::{
     CredentialStore, NAMESPACES_SUBDIR, StoredRegistryCredentials, env,
 };
 use std::{collections::HashMap, path::PathBuf};
-use tokio::io::{self, AsyncReadExt};
+use tokio::io::{self, AsyncRead, AsyncReadExt};
 use typed_path::Utf8UnixPathBuf;
 
 //--------------------------------------------------------------------------------------------------
@@ -683,14 +683,15 @@ pub async fn login_subcommand(
     token: Option<String>,
 ) -> MicrosandboxCliResult<()> {
     let registry = resolve_registry_host(registry);
-    let creds = resolve_login_credentials(username, password_stdin, token).await?;
-
-    let (stored_credentials, saved_message) = match creds {
-        LoginCredentials::Basic { username, password } => (
-            StoredRegistryCredentials::Basic { username, password },
-            "credentials",
-        ),
-        LoginCredentials::Token { token } => (StoredRegistryCredentials::Token { token }, "token"),
+    let cli_password = if password_stdin {
+        Some(read_password_from_stdin().await?)
+    } else {
+        None
+    };
+    let stored_credentials = resolve_explicit_credentials(username, cli_password, token)?;
+    let saved_message = match &stored_credentials {
+        StoredRegistryCredentials::Basic { .. } => "credentials",
+        StoredRegistryCredentials::Token { .. } => "token",
     };
 
     CredentialStore::store_registry_credentials(&registry, stored_credentials)
@@ -791,11 +792,6 @@ fn parse_name_and_script(name_and_script: &str) -> (&str, Option<&str>) {
 // Functions: Login Helpers
 //--------------------------------------------------------------------------------------------------
 
-enum LoginCredentials {
-    Basic { username: String, password: String },
-    Token { token: String },
-}
-
 /// Resolve the effective registry host from CLI and environment configuration.
 ///
 /// Resolution order is: explicit `registry` argument, `MSB_REGISTRY_HOST`,
@@ -808,84 +804,21 @@ fn resolve_registry_host(registry: Option<String>) -> String {
     normalize_registry_host(&host)
 }
 
-/// Resolve login credentials from CLI flags with environment fallback.
-///
-/// CLI credentials are validated first. If CLI input is present but invalid,
-/// resolution falls back to environment variables. Token-based and
-/// username/password-based authentication is mutually exclusive.
-async fn resolve_login_credentials(
-    username: Option<String>,
-    password_stdin: bool,
-    token: Option<String>,
-) -> MicrosandboxCliResult<LoginCredentials> {
-    let cli_password = if password_stdin {
-        Some(read_password_from_stdin().await?)
-    } else {
-        None
-    };
-
-    let cli_provided = token.is_some() || username.is_some() || password_stdin;
-    if cli_provided {
-        let cli_result = if token.is_some() && (username.is_some() || cli_password.is_some()) {
-            Err(MicrosandboxCliError::InvalidArgument(
-                "token cannot be combined with username/password".to_string(),
-            ))
-        } else if let Some(token) = token {
-            Ok(LoginCredentials::Token { token })
-        } else {
-            match (username, cli_password) {
-                (Some(username), Some(password)) => {
-                    Ok(LoginCredentials::Basic { username, password })
-                }
-                (None, None) => Err(MicrosandboxCliError::InvalidArgument(
-                    "no credentials provided; use flags or environment variables".to_string(),
-                )),
-                _ => Err(MicrosandboxCliError::InvalidArgument(
-                    "both username and password are required".to_string(),
-                )),
-            }
-        };
-
-        if let Ok(creds) = cli_result {
-            return Ok(creds);
-        }
-
-        // CLI was provided but invalid; attempt env fallback.
-        tracing::debug!("login: CLI credentials invalid, falling back to environment variables");
-    }
-
-    let env_token = env::get_registry_token();
-    let env_username = env::get_registry_username();
-    let env_password = env::get_registry_password();
-
-    if env_token.is_some() && (env_username.is_some() || env_password.is_some()) {
-        return Err(MicrosandboxCliError::InvalidArgument(
-            "token cannot be combined with username/password".to_string(),
-        ));
-    }
-
-    if let Some(token) = env_token {
-        return Ok(LoginCredentials::Token { token });
-    }
-
-    match (env_username, env_password) {
-        (Some(username), Some(password)) => Ok(LoginCredentials::Basic { username, password }),
-        (None, None) => Err(MicrosandboxCliError::InvalidArgument(
-            "no credentials provided; use flags or environment variables".to_string(),
-        )),
-        _ => Err(MicrosandboxCliError::InvalidArgument(
-            "both username and password are required".to_string(),
-        )),
-    }
-}
-
 /// Read a password from stdin and trim trailing newlines.
 ///
 /// Returns an error when stdin is empty after trimming.
 async fn read_password_from_stdin() -> MicrosandboxCliResult<String> {
-    let mut input = String::new();
     let mut stdin = io::stdin();
-    stdin.read_to_string(&mut input).await?;
+    read_password_from_reader(&mut stdin).await
+}
+
+/// Read a password from any async reader and trim trailing newlines.
+async fn read_password_from_reader<R>(reader: &mut R) -> MicrosandboxCliResult<String>
+where
+    R: AsyncRead + Unpin,
+{
+    let mut input = String::new();
+    reader.read_to_string(&mut input).await?;
     let password = input.trim_end_matches(&['\n', '\r'][..]).to_string();
     if password.is_empty() {
         return Err(MicrosandboxCliError::InvalidArgument(
@@ -1031,5 +964,188 @@ fn validate_build_sandbox_conflict(
                 ),
             )
             .exit();
+    }
+}
+
+//--------------------------------------------------------------------------------------------------
+// Tests
+//--------------------------------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Mutex;
+    use tokio::io::AsyncWriteExt;
+
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
+
+    fn lock_env() -> std::sync::MutexGuard<'static, ()> {
+        ENV_LOCK.lock().unwrap_or_else(|err| err.into_inner())
+    }
+
+    struct EnvGuard {
+        key: &'static str,
+        prev: Option<std::ffi::OsString>,
+    }
+
+    impl EnvGuard {
+        fn set(key: &'static str, value: impl Into<std::ffi::OsString>) -> Self {
+            let prev = std::env::var_os(key);
+            let value: std::ffi::OsString = value.into();
+            unsafe { std::env::set_var(key, &value) };
+            Self { key, prev }
+        }
+    }
+
+    impl Drop for EnvGuard {
+        fn drop(&mut self) {
+            if let Some(value) = self.prev.take() {
+                unsafe { std::env::set_var(self.key, value) };
+            } else {
+                unsafe { std::env::remove_var(self.key) };
+            }
+        }
+    }
+
+    #[test]
+    fn resolve_registry_host_prefers_cli_value() {
+        let _lock = lock_env();
+        let _host = EnvGuard::set(env::MSB_REGISTRY_HOST_ENV_VAR, "env.example.com");
+        let resolved = resolve_registry_host(Some("cli.example.com".to_string()));
+        assert_eq!(resolved, "cli.example.com");
+    }
+
+    #[test]
+    fn resolve_registry_host_uses_env_when_cli_missing() {
+        let _lock = lock_env();
+        let _host = EnvGuard::set(env::MSB_REGISTRY_HOST_ENV_VAR, "https://Env.Example.com/");
+        let resolved = resolve_registry_host(None);
+        assert_eq!(resolved, "env.example.com");
+    }
+
+    #[test]
+    fn resolve_explicit_auth_prefers_token() {
+        let creds = resolve_explicit_credentials(None, None, Some("cli-token".to_string()))
+            .expect("resolve creds");
+        assert!(matches!(
+            creds,
+            StoredRegistryCredentials::Token { token } if token == "cli-token"
+        ));
+    }
+
+    #[test]
+    fn resolve_explicit_auth_accepts_basic_auth() {
+        let creds = resolve_explicit_credentials(
+            Some("user".to_string()),
+            Some("pass".to_string()),
+            None,
+        )
+        .expect("resolve creds");
+        assert!(matches!(
+            creds,
+            StoredRegistryCredentials::Basic { username, password }
+                if username == "user" && password == "pass"
+        ));
+    }
+
+    #[test]
+    fn resolve_explicit_auth_errors_for_conflicting_inputs() {
+        let result = resolve_explicit_credentials(
+            Some("user".to_string()),
+            Some("pass".to_string()),
+            Some("token".to_string()),
+        );
+        assert!(matches!(
+            result,
+            Err(microsandbox_core::MicrosandboxError::InvalidArgument(_))
+        ));
+    }
+
+    #[test]
+    fn resolve_explicit_auth_errors_when_missing() {
+        let result = resolve_explicit_credentials(None, None, None);
+        assert!(matches!(
+            result,
+            Err(microsandbox_core::MicrosandboxError::InvalidArgument(_))
+        ));
+    }
+
+    #[tokio::test]
+    async fn read_password_from_stdin_trims_trailing_newline() {
+        let (mut writer, mut reader) = tokio::io::duplex(64);
+        writer.write_all(b"secret\n").await.expect("write");
+        drop(writer);
+
+        let password = read_password_from_reader(&mut reader).await.expect("password");
+        assert_eq!(password, "secret");
+    }
+
+    #[tokio::test]
+    async fn read_password_from_stdin_errors_on_empty_input() {
+        let (mut writer, mut reader) = tokio::io::duplex(64);
+        writer.write_all(b"\n").await.expect("write");
+        drop(writer);
+
+        let result = read_password_from_reader(&mut reader).await;
+        assert!(matches!(
+            result,
+            Err(MicrosandboxCliError::InvalidArgument(_))
+        ));
+    }
+
+    #[tokio::test]
+    async fn read_password_from_stdin_trims_trailing_carriage_return() {
+        let (mut writer, mut reader) = tokio::io::duplex(64);
+        writer.write_all(b"secret\r").await.expect("write");
+        drop(writer);
+
+        let password = read_password_from_reader(&mut reader).await.expect("password");
+        assert_eq!(password, "secret");
+    }
+
+    #[tokio::test]
+    async fn read_password_from_stdin_trims_trailing_crlf() {
+        let (mut writer, mut reader) = tokio::io::duplex(64);
+        writer.write_all(b"secret\r\n").await.expect("write");
+        drop(writer);
+
+        let password = read_password_from_reader(&mut reader).await.expect("password");
+        assert_eq!(password, "secret");
+    }
+
+    #[tokio::test]
+    async fn read_password_from_stdin_trims_multiple_trailing_newlines() {
+        let (mut writer, mut reader) = tokio::io::duplex(64);
+        writer.write_all(b"secret\n\n\r\n").await.expect("write");
+        drop(writer);
+
+        let password = read_password_from_reader(&mut reader).await.expect("password");
+        assert_eq!(password, "secret");
+    }
+
+    #[tokio::test]
+    async fn read_password_from_stdin_errors_on_empty_input_with_carriage_return() {
+        let (mut writer, mut reader) = tokio::io::duplex(64);
+        writer.write_all(b"\r").await.expect("write");
+        drop(writer);
+
+        let result = read_password_from_reader(&mut reader).await;
+        assert!(matches!(
+            result,
+            Err(MicrosandboxCliError::InvalidArgument(_))
+        ));
+    }
+
+    #[tokio::test]
+    async fn read_password_from_stdin_errors_on_empty_input_with_crlf() {
+        let (mut writer, mut reader) = tokio::io::duplex(64);
+        writer.write_all(b"\r\n").await.expect("write");
+        drop(writer);
+
+        let result = read_password_from_reader(&mut reader).await;
+        assert!(matches!(
+            result,
+            Err(MicrosandboxCliError::InvalidArgument(_))
+        ));
     }
 }
