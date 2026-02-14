@@ -1,6 +1,6 @@
 use std::sync::Mutex;
 
-use microsandbox_core::{management::image::resolve_registry_auth, oci::Reference};
+use microsandbox_core::{oci::Reference, oci::resolve_registry_auth};
 use microsandbox_utils::{
     StoredRegistryCredentials, clear_registry_credentials, env, store_registry_credentials,
 };
