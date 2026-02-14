@@ -14,6 +14,7 @@
 
 use std::{
     net::{IpAddr, SocketAddr},
+    ops::RangeInclusive,
     path::PathBuf,
 };
 
@@ -57,11 +58,8 @@ pub struct Config {
     /// Address to listen on
     addr: SocketAddr,
 
-    /// Minimum port for sandbox port range (if set)
-    port_range_min: Option<u16>,
-
-    /// Maximum port for sandbox port range (if set)
-    port_range_max: Option<u16>,
+    /// Port range for sandbox allocation (if set)
+    port_range: Option<RangeInclusive<u16>>,
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -99,11 +97,6 @@ impl Config {
 
         // Load sandbox port range from environment variables
         let port_range = env::get_sandbox_port_range();
-        let (port_range_min, port_range_max) = match port_range {
-            Some(range) => (Some(*range.start()), Some(*range.end())),
-            None => (None, None),
-        };
-
         Ok(Self {
             key,
             namespace_dir,
@@ -111,8 +104,7 @@ impl Config {
             host: host_ip,
             port,
             addr,
-            port_range_min,
-            port_range_max,
+            port_range,
         })
     }
 }
