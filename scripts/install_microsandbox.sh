@@ -77,7 +77,7 @@ check_command() {
 # Check required commands
 check_command curl
 check_command tar
-check_command shasum
+check_command sha256sum
 
 # Detect OS and architecture
 detect_platform() {
@@ -196,10 +196,10 @@ verify_checksum() {
     info "Expected checksum: $(cat "$CHECKSUM_FILE")"
 
     # Verify with more detailed error output
-    if ! shasum -a 256 -c "$CHECKSUM_FILE" 2>/tmp/shasum_error.log; then
+    if ! sha256sum -c "$CHECKSUM_FILE" 2>/tmp/shasum_error.log; then
         error "Checksum verification failed"
         error "Expected: $(cat "$CHECKSUM_FILE" 2>/dev/null || echo 'Unable to read checksum file')"
-        error "Actual: $(shasum -a 256 "$ARCHIVE_NAME" 2>/dev/null || echo 'Unable to calculate checksum')"
+        error "Actual: $(sha256sum "$ARCHIVE_NAME" 2>/dev/null || echo 'Unable to calculate checksum')"
         error "Error details: $(cat /tmp/shasum_error.log 2>/dev/null || echo 'No additional details')"
         exit 1
     fi
