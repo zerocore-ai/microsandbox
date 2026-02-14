@@ -37,10 +37,9 @@ impl Reference {
     /// callers can verify possible `301` redirect behavior explicitly.
     pub fn registry(&self) -> MicrosandboxResult<Url> {
         let raw = self.to_string();
-        let host = raw
-            .split('/')
-            .next()
-            .ok_or_else(|| MicrosandboxError::InvalidArgument("invalid image reference".to_string()))?;
+        let host = raw.split('/').next().ok_or_else(|| {
+            MicrosandboxError::InvalidArgument("invalid image reference".to_string())
+        })?;
 
         let host = normalize_registry_host(host);
         Url::parse(&format!("https://{}", host))

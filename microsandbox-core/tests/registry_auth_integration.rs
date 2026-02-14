@@ -1,6 +1,6 @@
 use std::sync::Mutex;
 
-use microsandbox_core::{oci::Reference, oci::resolve_auth};
+use microsandbox_core::oci::{Reference, resolve_auth};
 use microsandbox_utils::{CredentialStore, StoredRegistryCredentials, env};
 use tempfile::TempDir;
 

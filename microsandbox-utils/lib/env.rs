@@ -83,4 +83,3 @@ pub fn get_registry_password() -> Option<String> {
 pub fn get_registry_token() -> Option<String> {
     std::env::var(MSB_REGISTRY_TOKEN_ENV_VAR).ok()
 }
-

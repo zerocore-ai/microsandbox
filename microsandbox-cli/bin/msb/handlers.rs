@@ -12,7 +12,7 @@ use microsandbox_core::{
 };
 use microsandbox_server::MicrosandboxServerResult;
 use microsandbox_utils::{
-    CredentialStore, NAMESPACES_SUBDIR, PROJECTS_SUBDIR, StoredRegistryCredentials, env,
+    CredentialStore, PROJECTS_SUBDIR, StoredRegistryCredentials, env,
 };
 use std::{collections::HashMap, path::PathBuf};
 use tokio::io::{self, AsyncRead, AsyncReadExt};
@@ -975,12 +975,9 @@ mod tests {
 
     #[test]
     fn resolve_explicit_auth_accepts_basic_auth() {
-        let creds = resolve_explicit_credentials(
-            Some("user".to_string()),
-            Some("pass".to_string()),
-            None,
-        )
-        .expect("resolve creds");
+        let creds =
+            resolve_explicit_credentials(Some("user".to_string()), Some("pass".to_string()), None)
+                .expect("resolve creds");
         assert!(matches!(
             creds,
             StoredRegistryCredentials::Basic { username, password }
@@ -1016,7 +1013,9 @@ mod tests {
         writer.write_all(b"secret\n").await.expect("write");
         drop(writer);
 
-        let password = read_password_from_reader(&mut reader).await.expect("password");
+        let password = read_password_from_reader(&mut reader)
+            .await
+            .expect("password");
         assert_eq!(password, "secret");
     }
 
@@ -1039,7 +1038,9 @@ mod tests {
         writer.write_all(b"secret\r").await.expect("write");
         drop(writer);
 
-        let password = read_password_from_reader(&mut reader).await.expect("password");
+        let password = read_password_from_reader(&mut reader)
+            .await
+            .expect("password");
         assert_eq!(password, "secret");
     }
 
@@ -1049,7 +1050,9 @@ mod tests {
         writer.write_all(b"secret\r\n").await.expect("write");
         drop(writer);
 
-        let password = read_password_from_reader(&mut reader).await.expect("password");
+        let password = read_password_from_reader(&mut reader)
+            .await
+            .expect("password");
         assert_eq!(password, "secret");
     }
 
@@ -1059,7 +1062,9 @@ mod tests {
         writer.write_all(b"secret\n\n\r\n").await.expect("write");
         drop(writer);
 
-        let password = read_password_from_reader(&mut reader).await.expect("password");
+        let password = read_password_from_reader(&mut reader)
+            .await
+            .expect("password");
         assert_eq!(password, "secret");
     }
 

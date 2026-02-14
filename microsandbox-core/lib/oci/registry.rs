@@ -110,7 +110,9 @@ pub fn resolve_auth(reference: &Reference) -> MicrosandboxResult<RegistryAuth> {
     let registry = reference
         .registry()?
         .host_str()
-        .ok_or_else(|| MicrosandboxError::InvalidArgument("reference missing registry host".to_string()))?
+        .ok_or_else(|| {
+            MicrosandboxError::InvalidArgument("reference missing registry host".to_string())
+        })?
         .to_string();
 
     match parse_credential_inputs(
@@ -511,8 +513,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::Mutex;
     use crate::oci::normalize_registry_host;
+    use std::sync::Mutex;
 
     use microsandbox_utils::{CredentialStore, StoredRegistryCredentials};
     use tempfile::TempDir;
@@ -568,7 +570,10 @@ mod tests {
 
     #[test]
     fn normalize_registry_host_preserves_index_docker_io() {
-        assert_eq!(normalize_registry_host("index.docker.io"), "index.docker.io");
+        assert_eq!(
+            normalize_registry_host("index.docker.io"),
+            "index.docker.io"
+        );
     }
 
     #[test]
@@ -587,12 +592,9 @@ mod tests {
 
     #[test]
     fn resolve_explicit_credentials_accepts_basic() {
-        let auth = resolve_explicit_credentials(
-            Some("user".to_string()),
-            Some("pass".to_string()),
-            None,
-        )
-        .unwrap();
+        let auth =
+            resolve_explicit_credentials(Some("user".to_string()), Some("pass".to_string()), None)
+                .unwrap();
         assert!(matches!(
             auth,
             StoredRegistryCredentials::Basic { username, password }
