@@ -100,7 +100,7 @@ impl Config {
         // Load sandbox port range from environment variables
         let port_range = env::get_sandbox_port_range();
         let (port_range_min, port_range_max) = match port_range {
-            Some((min, max)) => (Some(min), Some(max)),
+            Some(range) => (Some(*range.start()), Some(*range.end())),
             None => (None, None),
         };
 
