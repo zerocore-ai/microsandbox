@@ -684,27 +684,20 @@ pub async fn login_subcommand(
     let registry = resolve_registry_host(registry);
     let creds = resolve_login_credentials(username, password_stdin, token).await?;
 
-    match creds {
-        LoginCredentials::Basic { username, password } => {
-            store_registry_credentials(
-                &registry,
-                StoredRegistryCredentials::Basic { username, password },
-            )
-            .map_err(|err| MicrosandboxCliError::ConfigError(err.to_string()))?;
-            println!(
-                "info: credentials saved for registry {} (not validated)",
-                registry
-            );
-        }
-        LoginCredentials::Token { token } => {
-            store_registry_credentials(&registry, StoredRegistryCredentials::Token { token })
-                .map_err(|err| MicrosandboxCliError::ConfigError(err.to_string()))?;
-            println!(
-                "info: token saved for registry {} (not validated)",
-                registry
-            );
-        }
-    }
+    let (stored_credentials, saved_message) = match creds {
+        LoginCredentials::Basic { username, password } => (
+            StoredRegistryCredentials::Basic { username, password },
+            "credentials",
+        ),
+        LoginCredentials::Token { token } => (StoredRegistryCredentials::Token { token }, "token"),
+    };
+
+    store_registry_credentials(&registry, stored_credentials)
+        .map_err(|err| MicrosandboxCliError::ConfigError(err.to_string()))?;
+    println!(
+        "info: {} saved for registry {} (not validated)",
+        saved_message, registry
+    );
 
     Ok(())
 }
