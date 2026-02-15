@@ -8,7 +8,7 @@ use microsandbox_core::{
         config::{self, Component, ComponentType, SandboxConfig},
         home, menv, orchestra, sandbox, toolchain,
     },
-    oci::{Reference, normalize_registry_host, resolve_explicit_credentials},
+    oci::{Reference, resolve_explicit_credentials},
 };
 use microsandbox_server::MicrosandboxServerResult;
 use microsandbox_utils::{
@@ -737,11 +737,23 @@ fn parse_name_and_script(name_and_script: &str) -> (&str, Option<&str>) {
 /// Resolution order is: explicit `registry` argument, `MSB_REGISTRY_HOST`,
 /// then the default OCI registry. The returned host is normalized.
 fn resolve_registry_host(registry: Option<String>) -> String {
-    let host = registry
-        .or_else(env::get_registry_host)
-        .unwrap_or_else(env::get_oci_registry);
-
+    let host = registry.unwrap_or_else(env::get_oci_registry);
     normalize_registry_host(&host)
+}
+
+/// Normalize a given host url string
+///
+/// This for avoiding common user input issues like including protocol or trailing slashes.
+pub fn normalize_registry_host(host: &str) -> String {
+    let mut normalized = host.trim().to_lowercase();
+
+    if let Some(stripped) = normalized.strip_prefix("https://") {
+        normalized = stripped.to_string();
+    } else if let Some(stripped) = normalized.strip_prefix("http://") {
+        normalized = stripped.to_string();
+    }
+
+    return normalized.trim_end_matches('/').to_string();
 }
 
 /// Read a password from stdin and trim trailing newlines.
