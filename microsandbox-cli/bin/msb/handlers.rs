@@ -11,9 +11,7 @@ use microsandbox_core::{
     oci::{Reference, resolve_explicit_credentials},
 };
 use microsandbox_server::MicrosandboxServerResult;
-use microsandbox_utils::{
-    CredentialStore, PROJECTS_SUBDIR, MsbRegistryAuth, env,
-};
+use microsandbox_utils::{CredentialStore, MsbRegistryAuth, PROJECTS_SUBDIR, env};
 use std::{collections::HashMap, path::PathBuf};
 use tokio::io::{self, AsyncRead, AsyncReadExt};
 use typed_path::Utf8UnixPathBuf;
@@ -745,7 +743,7 @@ pub fn normalize_registry_host(host: &str) -> String {
         normalized = stripped.to_string();
     }
 
-    return normalized.trim_end_matches('/').to_string();
+    normalized.trim_end_matches('/').to_string()
 }
 
 /// Read a password from stdin and trim trailing newlines.
