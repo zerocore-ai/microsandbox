@@ -20,7 +20,7 @@ use tokio::{
     io::AsyncWriteExt,
 };
 
-use microsandbox_utils::{CredentialStore, StoredRegistryCredentials, env};
+use microsandbox_utils::{CredentialStore, MsbRegistryAuth, env};
 
 use crate::{
     MicrosandboxError, MicrosandboxResult,
@@ -49,7 +49,7 @@ const DOWNLOAD_LAYER_MSG: &str = "Download layers";
 pub(crate) const DOCKER_REFERENCE_TYPE_ANNOTATION: &str = "vnd.docker.reference.type";
 
 enum ParsedCredentials {
-    Present(StoredRegistryCredentials),
+    Present(MsbRegistryAuth),
     Missing,
     Incomplete,
 }
@@ -67,13 +67,13 @@ fn parse_credential_inputs(
 
     if let Some(token) = input_token {
         return Ok(ParsedCredentials::Present(
-            StoredRegistryCredentials::Token { token },
+            MsbRegistryAuth::Token { token },
         ));
     }
 
     match (input_username, input_password) {
         (Some(username), Some(password)) => Ok(ParsedCredentials::Present(
-            StoredRegistryCredentials::Basic { username, password },
+            MsbRegistryAuth::Basic { username, password },
         )),
         (None, None) => Ok(ParsedCredentials::Missing),
         _ => Ok(ParsedCredentials::Incomplete),
@@ -87,7 +87,7 @@ pub fn resolve_explicit_credentials(
     username: Option<String>,
     password: Option<String>,
     token: Option<String>,
-) -> MicrosandboxResult<StoredRegistryCredentials> {
+) -> MicrosandboxResult<MsbRegistryAuth> {
     match parse_credential_inputs(username, password, token)? {
         ParsedCredentials::Present(credentials) => Ok(credentials),
         ParsedCredentials::Missing => Err(MicrosandboxError::InvalidArgument(
@@ -132,12 +132,12 @@ pub fn resolve_auth(reference: &Reference) -> MicrosandboxResult<RegistryAuth> {
     Ok(RegistryAuth::Anonymous)
 }
 
-fn stored_to_registry_auth(stored: StoredRegistryCredentials) -> RegistryAuth {
+fn stored_to_registry_auth(stored: MsbRegistryAuth) -> RegistryAuth {
     match stored {
-        StoredRegistryCredentials::Basic { username, password } => {
+        MsbRegistryAuth::Basic { username, password } => {
             RegistryAuth::Basic(username, password)
         }
-        StoredRegistryCredentials::Token { token } => RegistryAuth::Bearer(token),
+        MsbRegistryAuth::Token { token } => RegistryAuth::Bearer(token),
     }
 }
 
@@ -509,7 +509,7 @@ mod tests {
     use super::*;
     use std::sync::Mutex;
 
-    use microsandbox_utils::{CredentialStore, StoredRegistryCredentials};
+    use microsandbox_utils::{CredentialStore, MsbRegistryAuth};
     use tempfile::TempDir;
 
     static ENV_LOCK: Mutex<()> = Mutex::new(());
@@ -519,14 +519,14 @@ mod tests {
     }
 
     fn keyring_roundtrip_available() -> bool {
-        let probe = StoredRegistryCredentials::Token {
+        let probe = MsbRegistryAuth::Token {
             token: "probe-token".to_string(),
         };
-        if CredentialStore::store_registry_credentials("ghcr.io", probe.clone()).is_err() {
+        if CredentialStore::store_registry_credentials("registry.test.invalid", probe.clone()).is_err() {
             return false;
         }
-        match CredentialStore::load_registry_credentials("ghcr.io") {
-            Ok(Some(StoredRegistryCredentials::Token { token })) => token == "probe-token",
+        match CredentialStore::load_registry_credentials("registry.test.invalid") {
+            Ok(Some(MsbRegistryAuth::Token { token })) => token == "probe-token",
             _ => false,
         }
     }
@@ -566,7 +566,7 @@ mod tests {
         let auth = resolve_explicit_credentials(None, None, Some("token-123".to_string())).unwrap();
         assert!(matches!(
             auth,
-            StoredRegistryCredentials::Token { token } if token == "token-123"
+            MsbRegistryAuth::Token { token } if token == "token-123"
         ));
     }
 
@@ -577,7 +577,7 @@ mod tests {
                 .unwrap();
         assert!(matches!(
             auth,
-            StoredRegistryCredentials::Basic { username, password }
+            MsbRegistryAuth::Basic { username, password }
                 if username == "user" && password == "pass"
         ));
     }
@@ -593,14 +593,14 @@ mod tests {
         let _msb_home = EnvGuard::set(env::MICROSANDBOX_HOME_ENV_VAR, msb_home.path());
         CredentialStore::clear_registry_credentials().expect("clear");
         CredentialStore::store_registry_credentials(
-            "ghcr.io",
-            StoredRegistryCredentials::Token {
+            "registry.test.invalid",
+            MsbRegistryAuth::Token {
                 token: "stored-token".to_string(),
             },
         )
         .expect("store");
 
-        let reference: Reference = "ghcr.io/org/app:1.0".parse().unwrap();
+        let reference: Reference = "registry.test.invalid/org/app:1.0".parse().unwrap();
         let auth = resolve_auth(&reference).expect("resolve auth");
         assert!(matches!(auth, RegistryAuth::Bearer(t) if t == "env-token"));
     }
@@ -616,14 +616,14 @@ mod tests {
         let _msb_home = EnvGuard::set(env::MICROSANDBOX_HOME_ENV_VAR, msb_home.path());
         CredentialStore::clear_registry_credentials().expect("clear");
         CredentialStore::store_registry_credentials(
-            "ghcr.io",
-            StoredRegistryCredentials::Token {
+            "registry.test.invalid",
+            MsbRegistryAuth::Token {
                 token: "stored-token".to_string(),
             },
         )
         .expect("store");
 
-        let reference: Reference = "ghcr.io/org/app:1.0".parse().unwrap();
+        let reference: Reference = "registry.test.invalid/org/app:1.0".parse().unwrap();
         let auth = resolve_auth(&reference).expect("resolve auth");
         assert!(matches!(auth, RegistryAuth::Basic(u, p) if u == "env-user" && p == "env-pass"));
     }
@@ -643,14 +643,14 @@ mod tests {
             return;
         }
         CredentialStore::store_registry_credentials(
-            "ghcr.io",
-            StoredRegistryCredentials::Token {
+            "registry.test.invalid",
+            MsbRegistryAuth::Token {
                 token: "stored-token".to_string(),
             },
         )
         .expect("store");
 
-        let reference: Reference = "ghcr.io/org/app:1.0".parse().unwrap();
+        let reference: Reference = "registry.test.invalid/org/app:1.0".parse().unwrap();
         let auth = resolve_auth(&reference).expect("resolve auth");
         assert!(matches!(auth, RegistryAuth::Bearer(t) if t == "stored-token"));
     }
@@ -670,14 +670,14 @@ mod tests {
             return;
         }
         CredentialStore::store_registry_credentials(
-            "ghcr.io",
-            StoredRegistryCredentials::Token {
+            "registry.test.invalid",
+            MsbRegistryAuth::Token {
                 token: "stored-token".to_string(),
             },
         )
         .expect("store");
 
-        let reference: Reference = "ghcr.io/org/app:1.0".parse().unwrap();
+        let reference: Reference = "registry.test.invalid/org/app:1.0".parse().unwrap();
         let auth = resolve_auth(&reference).expect("resolve auth");
         assert!(matches!(auth, RegistryAuth::Bearer(t) if t == "stored-token"));
     }
@@ -693,7 +693,7 @@ mod tests {
         let _msb_home = EnvGuard::set(env::MICROSANDBOX_HOME_ENV_VAR, msb_home.path());
         CredentialStore::clear_registry_credentials().expect("clear");
 
-        let reference: Reference = "ghcr.io/org/app:1.0".parse().unwrap();
+        let reference: Reference = "registry.test.invalid/org/app:1.0".parse().unwrap();
         let auth = resolve_auth(&reference).expect("resolve auth");
         assert!(matches!(auth, RegistryAuth::Anonymous));
     }
@@ -709,7 +709,7 @@ mod tests {
         let _msb_home = EnvGuard::set(env::MICROSANDBOX_HOME_ENV_VAR, msb_home.path());
         CredentialStore::clear_registry_credentials().expect("clear");
 
-        let reference: Reference = "ghcr.io/org/app:1.0".parse().unwrap();
+        let reference: Reference = "registry.test.invalid/org/app:1.0".parse().unwrap();
         let err = resolve_auth(&reference).expect_err("expected error");
         assert!(matches!(err, crate::MicrosandboxError::InvalidArgument(_)));
     }

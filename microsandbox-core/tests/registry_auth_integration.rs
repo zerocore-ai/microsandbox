@@ -1,7 +1,7 @@
 use std::sync::Mutex;
 
 use microsandbox_core::oci::{Reference, resolve_auth};
-use microsandbox_utils::{CredentialStore, StoredRegistryCredentials, env};
+use microsandbox_utils::{CredentialStore, MsbRegistryAuth, env};
 use tempfile::TempDir;
 
 static ENV_LOCK: Mutex<()> = Mutex::new(());
@@ -11,14 +11,14 @@ fn lock_env() -> std::sync::MutexGuard<'static, ()> {
 }
 
 fn keyring_roundtrip_available() -> bool {
-    let probe = StoredRegistryCredentials::Token {
+    let probe = MsbRegistryAuth::Token {
         token: "probe-token".to_string(),
     };
-    if CredentialStore::store_registry_credentials("ghcr.io", probe.clone()).is_err() {
+    if CredentialStore::store_registry_credentials("registry.test.invalid", probe.clone()).is_err() {
         return false;
     }
-    match CredentialStore::load_registry_credentials("ghcr.io") {
-        Ok(Some(StoredRegistryCredentials::Token { token })) => token == "probe-token",
+    match CredentialStore::load_registry_credentials("registry.test.invalid") {
+        Ok(Some(MsbRegistryAuth::Token { token })) => token == "probe-token",
         _ => false,
     }
 }
@@ -68,14 +68,14 @@ fn resolves_stored_credentials_when_env_missing() {
         return;
     }
     CredentialStore::store_registry_credentials(
-        "ghcr.io",
-        StoredRegistryCredentials::Token {
+        "registry.test.invalid",
+        MsbRegistryAuth::Token {
             token: "stored-token".to_string(),
         },
     )
     .expect("store");
 
-    let reference: Reference = "ghcr.io/org/app:1.0".parse().unwrap();
+    let reference: Reference = "registry.test.invalid/org/app:1.0".parse().unwrap();
     let auth = resolve_auth(&reference).expect("resolve auth");
     assert!(matches!(auth, oci_client::secrets::RegistryAuth::Bearer(t) if t == "stored-token"));
 }
@@ -91,7 +91,7 @@ fn env_overrides_with_token_when_present() {
     let _msb_home = EnvGuard::set(env::MICROSANDBOX_HOME_ENV_VAR, msb_home.path());
     CredentialStore::clear_registry_credentials().expect("clear");
 
-    let reference: Reference = "ghcr.io/org/app:1.0".parse().unwrap();
+    let reference: Reference = "registry.test.invalid/org/app:1.0".parse().unwrap();
     let auth = resolve_auth(&reference).expect("resolve auth");
     assert!(matches!(auth, oci_client::secrets::RegistryAuth::Bearer(t) if t == "env-token"));
 }
@@ -111,14 +111,14 @@ fn incomplete_env_falls_back_to_stored_credentials() {
         return;
     }
     CredentialStore::store_registry_credentials(
-        "ghcr.io",
-        StoredRegistryCredentials::Token {
+        "registry.test.invalid",
+        MsbRegistryAuth::Token {
             token: "stored-token".to_string(),
         },
     )
     .expect("store");
 
-    let reference: Reference = "ghcr.io/org/app:1.0".parse().unwrap();
+    let reference: Reference = "registry.test.invalid/org/app:1.0".parse().unwrap();
     let auth = resolve_auth(&reference).expect("resolve auth");
     assert!(matches!(auth, oci_client::secrets::RegistryAuth::Bearer(t) if t == "stored-token"));
 }

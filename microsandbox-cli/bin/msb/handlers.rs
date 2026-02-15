@@ -12,7 +12,7 @@ use microsandbox_core::{
 };
 use microsandbox_server::MicrosandboxServerResult;
 use microsandbox_utils::{
-    CredentialStore, PROJECTS_SUBDIR, StoredRegistryCredentials, env,
+    CredentialStore, PROJECTS_SUBDIR, MsbRegistryAuth, env,
 };
 use std::{collections::HashMap, path::PathBuf};
 use tokio::io::{self, AsyncRead, AsyncReadExt};
@@ -630,8 +630,8 @@ pub async fn login_subcommand(
     };
     let stored_credentials = resolve_explicit_credentials(username, cli_password, token)?;
     let saved_message = match &stored_credentials {
-        StoredRegistryCredentials::Basic { .. } => "credentials",
-        StoredRegistryCredentials::Token { .. } => "token",
+        MsbRegistryAuth::Basic { .. } => "credentials",
+        MsbRegistryAuth::Token { .. } => "token",
     };
 
     CredentialStore::store_registry_credentials(&registry, stored_credentials)
@@ -981,7 +981,7 @@ mod tests {
             .expect("resolve creds");
         assert!(matches!(
             creds,
-            StoredRegistryCredentials::Token { token } if token == "cli-token"
+            MsbRegistryAuth::Token { token } if token == "cli-token"
         ));
     }
 
@@ -992,7 +992,7 @@ mod tests {
                 .expect("resolve creds");
         assert!(matches!(
             creds,
-            StoredRegistryCredentials::Basic { username, password }
+            MsbRegistryAuth::Basic { username, password }
                 if username == "user" && password == "pass"
         ));
     }

@@ -1,15 +1,14 @@
 //! Registry auth persistence helpers.
 //!
 //! Credentials are persisted in the platform secure credential store via `keyring`.
-//! A local metadata file is used only to track registry hosts for lifecycle operations.
 //!
 //! # Examples
 //! ```no_run
-//! use microsandbox_utils::{CredentialStore, StoredRegistryCredentials};
+//! use microsandbox_utils::{CredentialStore, MsbRegistryAuth};
 //!
 //! CredentialStore::store_registry_credentials(
 //!     "ghcr.io",
-//!     StoredRegistryCredentials::Token {
+//!     MsbRegistryAuth::Token {
 //!         token: "token-123".to_string(),
 //!     },
 //! )?;
@@ -18,7 +17,7 @@
 //!     .expect("missing credentials");
 //!
 //! match creds {
-//!     StoredRegistryCredentials::Token { token } => {
+//!     MsbRegistryAuth::Token { token } => {
 //!         assert_eq!(token, "token-123");
 //!     }
 //!     _ => unreachable!("expected token credentials"),
@@ -28,9 +27,9 @@
 //!
 //! # Keyring Backend Availability (Tests/CI)
 //! ```no_run
-//! use microsandbox_utils::{CredentialStore, StoredRegistryCredentials};
+//! use microsandbox_utils::{CredentialStore, MsbRegistryAuth};
 //!
-//! let probe = StoredRegistryCredentials::Token {
+//! let probe = MsbRegistryAuth::Token {
 //!     token: "probe-token".to_string(),
 //! };
 //!
@@ -41,7 +40,7 @@
 //! // In those cases, reads may return None even after a successful store.
 //! let roundtrip_ok = matches!(
 //!     CredentialStore::load_registry_credentials("ghcr.io")?,
-//!     Some(StoredRegistryCredentials::Token { ref token }) if token == "probe-token"
+//!     Some(MsbRegistryAuth::Token { ref token }) if token == "probe-token"
 //! );
 //!
 //! if !roundtrip_ok {
@@ -62,7 +61,7 @@ use crate::MicrosandboxUtilsResult;
 /// Stored credentials for a registry host.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
-pub enum StoredRegistryCredentials {
+pub enum MsbRegistryAuth {
     /// Basic auth using username + password.
     #[serde(rename = "basic")]
     Basic {
@@ -93,7 +92,7 @@ impl CredentialStore {
     /// Returns `Ok(None)` when no credential exists in the platform secure store.
     pub fn load_registry_credentials(
         host: &str,
-    ) -> MicrosandboxUtilsResult<Option<StoredRegistryCredentials>> {
+    ) -> MicrosandboxUtilsResult<Option<MsbRegistryAuth>> {
         let entry = Self::entry(host)?;
         match entry.get_password() {
             Ok(raw) => Ok(Some(serde_json::from_str(&raw)?)),
@@ -107,7 +106,7 @@ impl CredentialStore {
     /// Returns an error if the secure store backend rejects persistence or retrieval.
     pub fn store_registry_credentials(
         host: &str,
-        credentials: StoredRegistryCredentials,
+        credentials: MsbRegistryAuth,
     ) -> MicrosandboxUtilsResult<()> {
         let entry = Self::entry(host)?;
         let serialized = serde_json::to_string(&credentials)?;
