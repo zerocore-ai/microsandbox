@@ -174,6 +174,8 @@ where
         reference: &Reference,
         credential_store: &S,
     ) -> MicrosandboxResult<RegistryAuth> {
+        // TODO: If Bearer auth fails during registry interaction, retry with Basic auth
+        // for registries like GHCR that may require username/password fallback.
         let registry = reference.resolve_registry().to_string();
 
         match parse_credential_inputs(

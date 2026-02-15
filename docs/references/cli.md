@@ -696,7 +696,7 @@ msb push myapp:latest
 ===
 
 ==- `msb login`
-Set registry credentials (persisted in microsandbox home).
+Set registry credentials (persisted in the system keyring).
 
 ```bash
 msb login [registry] [--username <user>] [--password-stdin] [--token <token>]
@@ -711,24 +711,24 @@ msb login [registry] [--username <user>] [--password-stdin] [--token <token>]
 **Examples:**
 
 ```bash
-# Provide a token
-msb login ghcr.io --token token123
+# Provide a token (bearer auth)
+msb login registry.example.com --token token123
 
 # Provide username and password via stdin
 echo "pass" | msb login docker.io --username user --password-stdin
 
-# Use env fallback if CLI is invalid
-export MSB_REGISTRY_TOKEN=token123
-msb login ghcr.io --username user --password-stdin
+# GHCR: use basic auth (username + PAT) instead of bearer token
+echo "$GITHUB_PAT" | msb login ghcr.io --username "$GITHUB_USER" --password-stdin
 ```
 
 !!!note
-`msb login` stores credentials locally but does not validate them against the registry.
-When pulling images, environment variables take priority over stored credentials.
+For registries like `ghcr.io`, prefer basic auth (`--username` + `--password-stdin` with a GitHub PAT).
+Using `--token` sends bearer auth and may return `invalid token` on GHCR.
 !!!
 
 !!!warning Security
-Credentials are stored in `~/.microsandbox/registry_auth.json`. Restrict file permissions and avoid sharing it.
+Credentials are stored in the system keyring under service names like `microsandbox:<registry>`.
+Protect your local keychain/session and avoid exposing secrets in shell history.
 !!!
 
 ===
@@ -737,21 +737,14 @@ Credentials are stored in `~/.microsandbox/registry_auth.json`. Restrict file pe
 Remove stored registry credentials.
 
 ```bash
-msb logout [registry] [--all]
+msb logout [registry]
 ```
-
-| Option    | Description                              |
-| --------- | ---------------------------------------- |
-| `--all`   | Remove all stored registry credentials   |
 
 **Examples:**
 
 ```bash
 # Remove credentials for a registry
 msb logout ghcr.io
-
-# Remove all stored credentials
-msb logout --all
 ```
 
 ===
