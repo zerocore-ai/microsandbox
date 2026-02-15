@@ -14,7 +14,7 @@
 
 use std::{
     net::{IpAddr, SocketAddr},
-    ops::RangeInclusive,
+    ops::Range,
     path::PathBuf,
 };
 
@@ -59,7 +59,7 @@ pub struct Config {
     addr: SocketAddr,
 
     /// Port range for sandbox allocation (if set)
-    port_range: Option<RangeInclusive<u16>>,
+    port_range: Option<Range<u16>>,
 }
 
 //--------------------------------------------------------------------------------------------------

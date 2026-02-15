@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener},
-    ops::RangeInclusive,
+    ops::Range,
     path::{Path, PathBuf},
 };
 use tokio::{fs, sync::Mutex};
@@ -66,8 +66,8 @@ pub struct PortManager {
     /// Path to the port mappings file
     file_path: PathBuf,
 
-    /// Optional inclusive port range for sandbox port allocation
-    port_range: Option<RangeInclusive<u16>>,
+    /// Optional port range for sandbox port allocation (upper bound exclusive)
+    port_range: Option<Range<u16>>,
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -168,16 +168,16 @@ impl PortManager {
     /// Create a new port manager with an optional port range
     pub async fn new_with_range(
         project_dir: impl AsRef<Path>,
-        port_range: Option<RangeInclusive<u16>>,
+        port_range: Option<Range<u16>>,
     ) -> MicrosandboxServerResult<Self> {
         let file_path = project_dir.as_ref().join(PORTAL_PORTS_FILE);
         let mappings = Self::load_mappings(&file_path).await?;
 
         if let Some(range) = port_range.as_ref() {
             info!(
-                "Port manager initialized with port range: {}-{}",
-                range.start(),
-                range.end()
+                "Port manager initialized with port range: {}..{} (upper exclusive)",
+                range.start,
+                range.end
             );
         } else {
             debug!("Port manager initialized with dynamic port allocation");
@@ -300,9 +300,9 @@ impl PortManager {
         // If a port range is configured, try to find an available port within it
         if let Some(range) = self.port_range.as_ref() {
             debug!(
-                "Attempting to find an available port in range {}-{}",
-                range.start(),
-                range.end()
+                "Attempting to find an available port in range {}..{} (upper exclusive)",
+                range.start,
+                range.end
             );
 
             for port in range.clone() {
@@ -314,9 +314,9 @@ impl PortManager {
 
             // If no port is available in the range, log a warning and try dynamic allocation
             warn!(
-                "No available ports found in configured range {}-{}, falling back to OS allocation",
-                range.start(),
-                range.end()
+                "No available ports found in configured range {}..{} (upper exclusive), falling back to OS allocation",
+                range.start,
+                range.end
             );
         }
 
