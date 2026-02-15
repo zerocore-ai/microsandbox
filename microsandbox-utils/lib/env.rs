@@ -11,9 +11,6 @@ use crate::{DEFAULT_MICROSANDBOX_HOME, DEFAULT_OCI_REGISTRY};
 /// Environment variable for the microsandbox home directory
 pub const MICROSANDBOX_HOME_ENV_VAR: &str = "MICROSANDBOX_HOME";
 
-/// Environment variable for the OCI registry domain
-pub const OCI_REGISTRY_ENV_VAR: &str = "OCI_REGISTRY_DOMAIN";
-
 /// Environment variable for registry host (CLI fallback)
 pub const MSB_REGISTRY_HOST_ENV_VAR: &str = "MSB_REGISTRY_HOST";
 
@@ -54,19 +51,14 @@ pub fn get_microsandbox_home_path() -> PathBuf {
 }
 
 /// Returns the domain for the OCI registry.
-/// If the OCI_REGISTRY_DOMAIN environment variable is set, returns that value.
+/// If the MSB_REGISTRY_HOST_ENV_VAR environment variable is set, returns that value.
 /// Otherwise, returns the default OCI registry domain.
 pub fn get_oci_registry() -> String {
-    if let Ok(oci_registry_domain) = std::env::var(OCI_REGISTRY_ENV_VAR) {
+    if let Ok(oci_registry_domain) = std::env::var(MSB_REGISTRY_HOST_ENV_VAR) {
         oci_registry_domain
     } else {
         DEFAULT_OCI_REGISTRY.to_string()
     }
-}
-
-/// Returns the registry host from environment, if set.
-pub fn get_registry_host() -> Option<String> {
-    std::env::var(MSB_REGISTRY_HOST_ENV_VAR).ok()
 }
 
 /// Returns the registry username from environment, if set.
