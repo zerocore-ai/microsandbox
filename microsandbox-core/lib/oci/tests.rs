@@ -9,8 +9,7 @@ use crate::{
 };
 
 use futures::StreamExt;
-use oci_client::manifest::OciManifest;
-use oci_client::secrets::RegistryAuth;
+use oci_client::{manifest::OciManifest, secrets::RegistryAuth};
 use oci_spec::image::{Digest, DigestAlgorithm, Os};
 use sqlx::Row;
 use tokio::{fs, io::AsyncWriteExt, test};
@@ -171,7 +170,9 @@ async fn test_docker_fetch_image_blob() -> anyhow::Result<()> {
     let auth = RegistryAuth::Anonymous;
 
     // Get a layer digest from manifest
-    let (manifest, _) = registry.fetch_manifest_and_config(&reference, &auth).await?;
+    let (manifest, _) = registry
+        .fetch_manifest_and_config(&reference, &auth)
+        .await?;
     let layer = manifest.layers.first().unwrap();
     let digest = Digest::try_from(layer.digest.clone()).unwrap();
     let mut stream = registry

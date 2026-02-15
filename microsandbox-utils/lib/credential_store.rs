@@ -82,7 +82,9 @@ pub enum MsbRegistryAuth {
 impl From<MsbRegistryAuth> for RegistryAuth {
     fn from(value: MsbRegistryAuth) -> Self {
         match value {
-            MsbRegistryAuth::Basic { username, password } => RegistryAuth::Basic(username, password),
+            MsbRegistryAuth::Basic { username, password } => {
+                RegistryAuth::Basic(username, password)
+            }
             MsbRegistryAuth::Token { token } => RegistryAuth::Bearer(token),
         }
     }
