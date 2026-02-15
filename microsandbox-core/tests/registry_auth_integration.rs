@@ -62,7 +62,7 @@ fn resolves_stored_credentials_when_env_missing() {
 
     let msb_home = TempDir::new().expect("temp msb home");
     let _msb_home = EnvGuard::set(env::MICROSANDBOX_HOME_ENV_VAR, msb_home.path());
-    CredentialStore::clear_registry_credentials().expect("clear");
+    let _ = CredentialStore::remove_registry_credentials("registry.test.invalid");
     if !keyring_roundtrip_available() {
         eprintln!("skipping: keyring backend does not support roundtrip in this environment");
         return;
@@ -76,7 +76,7 @@ fn resolves_stored_credentials_when_env_missing() {
     .expect("store");
 
     let reference: Reference = "registry.test.invalid/org/app:1.0".parse().unwrap();
-    let auth = resolve_auth(&reference).expect("resolve auth");
+    let auth = resolve_auth(&reference, &CredentialStore).expect("resolve auth");
     assert!(matches!(auth, oci_client::secrets::RegistryAuth::Bearer(t) if t == "stored-token"));
 }
 
@@ -89,10 +89,10 @@ fn env_overrides_with_token_when_present() {
 
     let msb_home = TempDir::new().expect("temp msb home");
     let _msb_home = EnvGuard::set(env::MICROSANDBOX_HOME_ENV_VAR, msb_home.path());
-    CredentialStore::clear_registry_credentials().expect("clear");
+    let _ = CredentialStore::remove_registry_credentials("registry.test.invalid");
 
     let reference: Reference = "registry.test.invalid/org/app:1.0".parse().unwrap();
-    let auth = resolve_auth(&reference).expect("resolve auth");
+    let auth = resolve_auth(&reference, &CredentialStore).expect("resolve auth");
     assert!(matches!(auth, oci_client::secrets::RegistryAuth::Bearer(t) if t == "env-token"));
 }
 
@@ -105,7 +105,7 @@ fn incomplete_env_falls_back_to_stored_credentials() {
 
     let msb_home = TempDir::new().expect("temp msb home");
     let _msb_home = EnvGuard::set(env::MICROSANDBOX_HOME_ENV_VAR, msb_home.path());
-    CredentialStore::clear_registry_credentials().expect("clear");
+    let _ = CredentialStore::remove_registry_credentials("registry.test.invalid");
     if !keyring_roundtrip_available() {
         eprintln!("skipping: keyring backend does not support roundtrip in this environment");
         return;
@@ -119,6 +119,6 @@ fn incomplete_env_falls_back_to_stored_credentials() {
     .expect("store");
 
     let reference: Reference = "registry.test.invalid/org/app:1.0".parse().unwrap();
-    let auth = resolve_auth(&reference).expect("resolve auth");
+    let auth = resolve_auth(&reference, &CredentialStore).expect("resolve auth");
     assert!(matches!(auth, oci_client::secrets::RegistryAuth::Bearer(t) if t == "stored-token"));
 }

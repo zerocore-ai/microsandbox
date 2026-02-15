@@ -258,8 +258,8 @@ async fn main() -> MicrosandboxCliResult<()> {
         }) => {
             handlers::login_subcommand(registry, username, password_stdin, token).await?;
         }
-        Some(MicrosandboxSubcommand::Logout { registry, all }) => {
-            handlers::logout_subcommand(registry, all).await?;
+        Some(MicrosandboxSubcommand::Logout { registry }) => {
+            handlers::logout_subcommand(registry).await?;
         }
         Some(MicrosandboxSubcommand::Push { image, name }) => {
             handlers::push_subcommand(image, name).await?;

@@ -542,10 +542,6 @@ pub enum MicrosandboxSubcommand {
     Logout {
         /// Registry host (defaults to OCI_REGISTRY_DOMAIN or docker.io)
         registry: Option<String>,
-
-        /// Remove all stored registry credentials
-        #[arg(long)]
-        all: bool,
     },
 
     /// Push image to a registry
