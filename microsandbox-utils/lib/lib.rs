@@ -5,7 +5,6 @@
 
 pub mod credential_store;
 pub mod defaults;
-pub mod docker_config;
 pub mod env;
 pub mod error;
 pub mod log;
@@ -20,7 +19,6 @@ pub mod term;
 
 pub use credential_store::*;
 pub use defaults::*;
-pub use docker_config::*;
 pub use env::*;
 pub use error::*;
 pub use log::*;
