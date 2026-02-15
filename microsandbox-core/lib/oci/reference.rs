@@ -2,9 +2,8 @@ use core::fmt;
 use std::{ops::Deref, str::FromStr};
 
 use serde;
-use url::Url;
 
-use crate::{MicrosandboxError, MicrosandboxResult};
+use crate::MicrosandboxError;
 
 //--------------------------------------------------------------------------------------------------
 // Types
@@ -28,40 +27,10 @@ impl Reference {
         self.reference.to_string()
     }
 
-    /// Resolve the registry URL for this image reference.
-    ///
-    /// This uses the parsed/normalized reference representation and returns an
-    /// `https://` URL for the registry host.
-    ///
-    /// `index.docker.io` is preserved as-is (not rewritten to `docker.io`) so
-    /// callers can verify possible `301` redirect behavior explicitly.
-    pub fn registry(&self) -> MicrosandboxResult<Url> {
-        let raw = self.to_string();
-        let host = raw.split('/').next().ok_or_else(|| {
-            MicrosandboxError::InvalidArgument("invalid image reference".to_string())
-        })?;
-
-        let host = normalize_registry_host(host);
-        Url::parse(&format!("https://{}", host))
-            .map_err(|err| MicrosandboxError::InvalidArgument(err.to_string()))
+    /// Resolve the effective registry host for this image reference.
+    pub fn resolve_registry(&self) -> &str {
+        self.reference.resolve_registry()
     }
-}
-
-/// Normalize a registry host for consistent lookups.
-///
-/// This ensures we store and resolve credentials under the same key.
-pub fn normalize_registry_host(host: &str) -> String {
-    let mut normalized = host.trim().to_lowercase();
-
-    if let Some(stripped) = normalized.strip_prefix("https://") {
-        normalized = stripped.to_string();
-    } else if let Some(stripped) = normalized.strip_prefix("http://") {
-        normalized = stripped.to_string();
-    }
-
-    normalized = normalized.trim_end_matches('/').to_string();
-
-    normalized
 }
 
 impl Deref for Reference {
@@ -113,23 +82,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn registry_uses_explicit_registry_host() {
+    fn resolve_registry_uses_explicit_registry_host() {
         let reference: Reference = "ghcr.io/org/app:1.0".parse().unwrap();
-        let url = reference.registry().unwrap();
-        assert_eq!(url.host_str(), Some("ghcr.io"));
+        assert_eq!(reference.resolve_registry(), "ghcr.io");
     }
 
     #[test]
-    fn registry_uses_normalized_default_registry_when_host_missing() {
+    fn resolve_registry_uses_index_docker_io_when_host_missing() {
         let reference: Reference = "org/app:1.0".parse().unwrap();
-        let url = reference.registry().unwrap();
-        assert_eq!(url.host_str(), Some("docker.io"));
+        assert_eq!(reference.resolve_registry(), "index.docker.io");
     }
 
     #[test]
-    fn registry_reflects_upstream_normalization_for_index_docker_io() {
+    fn resolve_registry_reflects_upstream_normalization_for_index_docker_io() {
         let reference: Reference = "index.docker.io/library/nginx:latest".parse().unwrap();
-        let url = reference.registry().unwrap();
-        assert_eq!(url.host_str(), Some("docker.io"));
+        assert_eq!(reference.resolve_registry(), "index.docker.io");
     }
 }
