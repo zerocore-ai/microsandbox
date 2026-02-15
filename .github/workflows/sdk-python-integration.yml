@@ -1,0 +1,46 @@
+name: Python SDK Integration Tests
+
+on:
+  pull_request:
+    paths:
+      - "sdk/python/**"
+      - ".github/workflows/sdk-python-integration.yml"
+
+jobs:
+  python-sdk:
+    name: Python SDK Smoke Tests
+    runs-on: self-hosted-Linux-x86
+
+    defaults:
+      run:
+        working-directory: sdk/python
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Python SDK
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+
+      - name: Verify SDK imports
+        run: |
+          python - <<EOF
+          import microsandbox
+          from microsandbox import PythonSandbox
+          print("Python SDK imports OK")
+          EOF
+
+      - name: Run SDK smoke examples
+        env:
+          MSB_SERVER_URL: http://127.0.0.1:5555
+        run: |
+          python examples/command.py
+          python examples/node.py
+          python examples/metrics.py
