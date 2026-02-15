@@ -176,8 +176,7 @@ impl PortManager {
         if let Some(range) = port_range.as_ref() {
             info!(
                 "Port manager initialized with port range: {}..{} (upper exclusive)",
-                range.start,
-                range.end
+                range.start, range.end
             );
         } else {
             debug!("Port manager initialized with dynamic port allocation");
@@ -301,8 +300,7 @@ impl PortManager {
         if let Some(range) = self.port_range.as_ref() {
             debug!(
                 "Attempting to find an available port in range {}..{} (upper exclusive)",
-                range.start,
-                range.end
+                range.start, range.end
             );
 
             for port in range.clone() {
@@ -315,8 +313,7 @@ impl PortManager {
             // If no port is available in the range, log a warning and try dynamic allocation
             warn!(
                 "No available ports found in configured range {}..{} (upper exclusive), falling back to OS allocation",
-                range.start,
-                range.end
+                range.start, range.end
             );
         }
 
