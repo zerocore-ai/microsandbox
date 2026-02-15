@@ -17,7 +17,7 @@ fn keyring_roundtrip_available() -> bool {
     if CredentialStore::store_registry_credentials("ghcr.io", probe.clone()).is_err() {
         return false;
     }
-    match CredentialStore::load_stored_registry_credentials("ghcr.io") {
+    match CredentialStore::load_registry_credentials("ghcr.io") {
         Ok(Some(StoredRegistryCredentials::Token { token })) => token == "probe-token",
         _ => false,
     }

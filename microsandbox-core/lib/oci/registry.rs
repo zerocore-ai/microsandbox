@@ -125,7 +125,7 @@ pub fn resolve_auth(reference: &Reference) -> MicrosandboxResult<RegistryAuth> {
         ParsedCredentials::Missing => {}
     }
 
-    if let Some(stored) = CredentialStore::load_stored_registry_credentials(&registry)? {
+    if let Some(stored) = CredentialStore::load_registry_credentials(&registry)? {
         return Ok(stored_to_registry_auth(stored));
     }
 
@@ -525,7 +525,7 @@ mod tests {
         if CredentialStore::store_registry_credentials("ghcr.io", probe.clone()).is_err() {
             return false;
         }
-        match CredentialStore::load_stored_registry_credentials("ghcr.io") {
+        match CredentialStore::load_registry_credentials("ghcr.io") {
             Ok(Some(StoredRegistryCredentials::Token { token })) => token == "probe-token",
             _ => false,
         }

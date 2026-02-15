@@ -14,7 +14,7 @@
 //!     },
 //! )?;
 //!
-//! let creds = CredentialStore::load_stored_registry_credentials("ghcr.io")?
+//! let creds = CredentialStore::load_registry_credentials("ghcr.io")?
 //!     .expect("missing credentials");
 //!
 //! match creds {
@@ -40,7 +40,7 @@
 //! // Some sandboxed/CI environments do not provide a fully functional keyring backend.
 //! // In those cases, reads may return None even after a successful store.
 //! let roundtrip_ok = matches!(
-//!     CredentialStore::load_stored_registry_credentials("ghcr.io")?,
+//!     CredentialStore::load_registry_credentials("ghcr.io")?,
 //!     Some(StoredRegistryCredentials::Token { ref token }) if token == "probe-token"
 //! );
 //!
@@ -103,7 +103,7 @@ impl CredentialStore {
     /// Load stored registry credentials for a host, if present.
     ///
     /// Returns `Ok(None)` when no credential exists in the platform secure store.
-    pub fn load_stored_registry_credentials(
+    pub fn load_registry_credentials(
         host: &str,
     ) -> MicrosandboxUtilsResult<Option<StoredRegistryCredentials>> {
         let entry = Self::entry(host)?;
