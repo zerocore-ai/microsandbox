@@ -647,16 +647,8 @@ pub async fn login_subcommand(
 
 /// Handle `msb logout` by removing stored registry credentials.
 ///
-/// When `all` is `true`, all saved registry credentials are removed.
-/// Otherwise, only credentials for the resolved registry host are deleted.
-pub async fn logout_subcommand(registry: Option<String>, all: bool) -> MicrosandboxCliResult<()> {
-    if all {
-        CredentialStore::clear_registry_credentials()
-            .map_err(|err| MicrosandboxCliError::ConfigError(err.to_string()))?;
-        tracing::info!("cleared all stored registry credentials");
-        return Ok(());
-    }
-
+/// Only credentials for the resolved registry host are deleted.
+pub async fn logout_subcommand(registry: Option<String>) -> MicrosandboxCliResult<()> {
     let registry = resolve_registry_host(registry);
     let removed = CredentialStore::remove_registry_credentials(&registry)
         .map_err(|err| MicrosandboxCliError::ConfigError(err.to_string()))?;
