@@ -14,6 +14,7 @@
 
 use std::{
     net::{IpAddr, SocketAddr},
+    ops::Range,
     path::PathBuf,
 };
 
@@ -56,6 +57,9 @@ pub struct Config {
 
     /// Address to listen on
     addr: SocketAddr,
+
+    /// Port range for sandbox allocation (if set)
+    port_range: Option<Range<u16>>,
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -91,6 +95,8 @@ impl Config {
         let project_dir =
             project_dir.unwrap_or_else(|| env::get_microsandbox_home_path().join(PROJECTS_SUBDIR));
 
+        // Load sandbox port range from environment variables
+        let port_range = env::get_sandbox_port_range();
         Ok(Self {
             key,
             project_dir,
@@ -98,6 +104,7 @@ impl Config {
             host: host_ip,
             port,
             addr,
+            port_range,
         })
     }
 }

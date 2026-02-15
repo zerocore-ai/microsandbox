@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener},
+    ops::Range,
     path::{Path, PathBuf},
 };
 use tokio::{fs, sync::Mutex};
@@ -64,6 +65,9 @@ pub struct PortManager {
 
     /// Path to the port mappings file
     file_path: PathBuf,
+
+    /// Optional port range for sandbox port allocation (upper bound exclusive)
+    port_range: Option<Range<u16>>,
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -158,12 +162,30 @@ impl BiPortMapping {
 impl PortManager {
     /// Create a new port manager
     pub async fn new(project_dir: impl AsRef<Path>) -> MicrosandboxServerResult<Self> {
+        Self::new_with_range(project_dir, None).await
+    }
+
+    /// Create a new port manager with an optional port range
+    pub async fn new_with_range(
+        project_dir: impl AsRef<Path>,
+        port_range: Option<Range<u16>>,
+    ) -> MicrosandboxServerResult<Self> {
         let file_path = project_dir.as_ref().join(PORTAL_PORTS_FILE);
         let mappings = Self::load_mappings(&file_path).await?;
+
+        if let Some(range) = port_range.as_ref() {
+            info!(
+                "Port manager initialized with port range: {}..{} (upper exclusive)",
+                range.start, range.end
+            );
+        } else {
+            debug!("Port manager initialized with dynamic port allocation");
+        }
 
         Ok(Self {
             mappings,
             file_path,
+            port_range,
         })
     }
 
@@ -240,8 +262,8 @@ impl PortManager {
         // Get a lock to ensure only one thread gets a port at a time
         let _lock = PORT_ASSIGNMENT_LOCK.lock().await;
 
-        // Get a truly available port from the OS
-        let port = self.get_available_port_from_os()?;
+        // Get an available port (from range or from OS)
+        let port = self.get_available_port()?;
 
         // Save the mapping
         self.mappings.insert(key.to_string(), port);
@@ -272,7 +294,34 @@ impl PortManager {
         TcpListener::bind(addr).is_ok()
     }
 
-    /// Get an available port from the OS
+    /// Get an available port from the OS or from the configured port range
+    fn get_available_port(&self) -> MicrosandboxServerResult<u16> {
+        // If a port range is configured, try to find an available port within it
+        if let Some(range) = self.port_range.as_ref() {
+            debug!(
+                "Attempting to find an available port in range {}..{} (upper exclusive)",
+                range.start, range.end
+            );
+
+            for port in range.clone() {
+                if self.verify_port_availability(port) {
+                    debug!("Found available port {} in configured range", port);
+                    return Ok(port);
+                }
+            }
+
+            // If no port is available in the range, log a warning and try dynamic allocation
+            warn!(
+                "No available ports found in configured range {}..{} (upper exclusive), falling back to OS allocation",
+                range.start, range.end
+            );
+        }
+
+        // Fall back to dynamic port allocation from the OS
+        self.get_available_port_from_os()
+    }
+
+    /// Get a truly available port from the OS by binding to port 0
     fn get_available_port_from_os(&self) -> MicrosandboxServerResult<u16> {
         // Bind to port 0 to let the OS assign an available port
         let addr = SocketAddr::new(LOCALHOST_IP, 0);

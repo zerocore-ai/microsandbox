@@ -43,9 +43,15 @@ pub async fn main() -> MicrosandboxCliResult<()> {
 
     // Get project directory from config
     let project_dir = config.get_project_dir().clone();
+    let port_range = config.get_port_range().clone();
 
-    // Initialize the port manager
-    let port_manager = PortManager::new(project_dir).await.map_err(|e| {
+    // Initialize the port manager with the configured port range
+    let port_manager = if let Some(range) = port_range {
+        PortManager::new_with_range(project_dir, Some(range)).await
+    } else {
+        PortManager::new(project_dir).await
+    }
+    .map_err(|e| {
         eprintln!("Error initializing port manager: {}", e);
         e
     })?;
