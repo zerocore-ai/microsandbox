@@ -67,7 +67,6 @@ toml.workspace = true
 tracing.workspace = true
 typed-builder.workspace = true
 typed-path.workspace = true
-url.workspace = true
 walkdir.workspace = true
 which.workspace = true
 xattr.workspace = true
