@@ -50,6 +50,7 @@
 //! ```
 
 use keyring::Entry;
+use oci_client::secrets::RegistryAuth;
 use serde::{Deserialize, Serialize};
 
 use crate::MicrosandboxUtilsResult;
@@ -76,6 +77,15 @@ pub enum MsbRegistryAuth {
         /// Registry token.
         token: String,
     },
+}
+
+impl From<MsbRegistryAuth> for RegistryAuth {
+    fn from(value: MsbRegistryAuth) -> Self {
+        match value {
+            MsbRegistryAuth::Basic { username, password } => RegistryAuth::Basic(username, password),
+            MsbRegistryAuth::Token { token } => RegistryAuth::Bearer(token),
+        }
+    }
 }
 
 /// Persistence API for registry credentials.

@@ -22,6 +22,7 @@ indicatif.workspace = true
 keyring.workspace = true
 libc.workspace = true
 nix = { workspace = true, features = ["fs", "process", "signal", "term"] }
+oci-client.workspace = true
 pretty-error-debug.workspace = true
 serde.workspace = true
 serde_json.workspace = true

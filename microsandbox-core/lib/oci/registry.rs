@@ -115,7 +115,7 @@ pub fn resolve_auth(reference: &Reference) -> MicrosandboxResult<RegistryAuth> {
         env::get_registry_token(),
     )? {
         ParsedCredentials::Present(credentials) => {
-            return Ok(stored_to_registry_auth(credentials));
+            return Ok(credentials.into());
         }
         ParsedCredentials::Incomplete => {
             tracing::warn!(
@@ -126,19 +126,10 @@ pub fn resolve_auth(reference: &Reference) -> MicrosandboxResult<RegistryAuth> {
     }
 
     if let Some(stored) = CredentialStore::load_registry_credentials(&registry)? {
-        return Ok(stored_to_registry_auth(stored));
+        return Ok(stored.into());
     }
 
     Ok(RegistryAuth::Anonymous)
-}
-
-fn stored_to_registry_auth(stored: MsbRegistryAuth) -> RegistryAuth {
-    match stored {
-        MsbRegistryAuth::Basic { username, password } => {
-            RegistryAuth::Basic(username, password)
-        }
-        MsbRegistryAuth::Token { token } => RegistryAuth::Bearer(token),
-    }
 }
 
 /// Registry is an abstraction over the logic for fetching images from a registry,
