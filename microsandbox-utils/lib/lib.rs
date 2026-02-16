@@ -3,6 +3,7 @@
 #![warn(missing_docs)]
 #![allow(clippy::module_inception)]
 
+pub mod credential_store;
 pub mod defaults;
 pub mod env;
 pub mod error;
@@ -16,6 +17,7 @@ pub mod term;
 // Exports
 //--------------------------------------------------------------------------------------------------
 
+pub use credential_store::*;
 pub use defaults::*;
 pub use env::*;
 pub use error::*;

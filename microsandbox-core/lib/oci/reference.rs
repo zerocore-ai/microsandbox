@@ -26,6 +26,11 @@ impl Reference {
     pub(crate) fn as_db_key(&self) -> String {
         self.reference.to_string()
     }
+
+    /// Resolve the effective registry host for this image reference.
+    pub fn resolve_registry(&self) -> &str {
+        self.reference.resolve_registry()
+    }
 }
 
 impl Deref for Reference {
@@ -65,5 +70,32 @@ impl TryFrom<String> for Reference {
 impl fmt::Display for Reference {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.reference)
+    }
+}
+
+//--------------------------------------------------------------------------------------------------
+// Tests
+//--------------------------------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn resolve_registry_uses_explicit_registry_host() {
+        let reference: Reference = "ghcr.io/org/app:1.0".parse().unwrap();
+        assert_eq!(reference.resolve_registry(), "ghcr.io");
+    }
+
+    #[test]
+    fn resolve_registry_uses_index_docker_io_when_host_missing() {
+        let reference: Reference = "org/app:1.0".parse().unwrap();
+        assert_eq!(reference.resolve_registry(), "index.docker.io");
+    }
+
+    #[test]
+    fn resolve_registry_reflects_upstream_normalization_for_index_docker_io() {
+        let reference: Reference = "index.docker.io/library/nginx:latest".parse().unwrap();
+        assert_eq!(reference.resolve_registry(), "index.docker.io");
     }
 }

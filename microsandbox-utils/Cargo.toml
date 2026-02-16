@@ -14,17 +14,31 @@ path = "lib/lib.rs"
 [dependencies]
 anyhow.workspace = true
 async-trait.workspace = true
+base64.workspace = true
 console.workspace = true
 dirs.workspace = true
 futures.workspace = true
 indicatif.workspace = true
+keyring.workspace = true
 libc.workspace = true
 nix = { workspace = true, features = ["fs", "process", "signal", "term"] }
+oci-client.workspace = true
 pretty-error-debug.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 typed-path.workspace = true
+
+[target.'cfg(target_os = "macos")'.dependencies]
+keyring = { workspace = true, features = ["apple-native"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+keyring = { workspace = true, features = ["linux-native"] }
+
+#TODO add windows feature if needed
 
 [dev-dependencies]
 tempfile.workspace = true

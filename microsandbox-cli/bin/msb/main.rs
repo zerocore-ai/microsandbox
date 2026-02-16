@@ -250,8 +250,16 @@ async fn main() -> MicrosandboxCliResult<()> {
                 handlers::server_ssh_subcommand(sandbox, name).await?;
             }
         },
-        Some(MicrosandboxSubcommand::Login) => {
-            handlers::login_subcommand().await?;
+        Some(MicrosandboxSubcommand::Login {
+            registry,
+            username,
+            password_stdin,
+            token,
+        }) => {
+            handlers::login_subcommand(registry, username, password_stdin, token).await?;
+        }
+        Some(MicrosandboxSubcommand::Logout { registry }) => {
+            handlers::logout_subcommand(registry).await?;
         }
         Some(MicrosandboxSubcommand::Push { image, name }) => {
             handlers::push_subcommand(image, name).await?;

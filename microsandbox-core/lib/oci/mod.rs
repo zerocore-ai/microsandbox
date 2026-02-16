@@ -23,4 +23,5 @@ pub(crate) use global_cache::*;
 pub use image::*;
 pub(crate) use layer::*;
 pub use reference::*;
+pub use registry::resolve_explicit_credentials;
 pub(crate) use registry::*;

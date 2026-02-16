@@ -38,7 +38,7 @@ use crate::{
 use futures::future;
 #[cfg(feature = "cli")]
 use microsandbox_utils::term::{self};
-use microsandbox_utils::{LAYERS_SUBDIR, OCI_DB_FILENAME, env};
+use microsandbox_utils::{CredentialStore, LAYERS_SUBDIR, OCI_DB_FILENAME, env};
 use oci_spec::image::{Digest, Os, Platform};
 use std::{path::PathBuf, sync::Arc};
 use tempfile::tempdir;
@@ -147,7 +147,7 @@ impl Image {
         let mut platform = Platform::default();
         platform.set_os(Os::Linux);
 
-        Registry::new(db.clone(), platform, layer_cache)
+        Registry::<GlobalCache>::new(db.clone(), platform, layer_cache, CredentialStore)
             .await?
             .pull_image(&image)
             .await

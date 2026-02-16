@@ -20,6 +20,8 @@ use tokio::{
     io::AsyncWriteExt,
 };
 
+use microsandbox_utils::{CredentialStore, MsbRegistryAuth, env};
+
 use crate::{
     MicrosandboxError, MicrosandboxResult,
     management::db,
@@ -46,28 +48,92 @@ const DOWNLOAD_LAYER_MSG: &str = "Download layers";
 
 pub(crate) const DOCKER_REFERENCE_TYPE_ANNOTATION: &str = "vnd.docker.reference.type";
 
+enum ParsedCredentials {
+    Present(MsbRegistryAuth),
+    Missing,
+    Incomplete,
+}
+
+pub trait RegistryCredentialStoreOps: Send + Sync {
+    fn load_registry_credentials(&self, host: &str) -> MicrosandboxResult<Option<MsbRegistryAuth>>;
+}
+
+impl RegistryCredentialStoreOps for CredentialStore {
+    fn load_registry_credentials(&self, host: &str) -> MicrosandboxResult<Option<MsbRegistryAuth>> {
+        CredentialStore::load_registry_credentials(host).map_err(Into::into)
+    }
+}
+
+fn parse_credential_inputs(
+    input_username: Option<String>,
+    input_password: Option<String>,
+    input_token: Option<String>,
+) -> MicrosandboxResult<ParsedCredentials> {
+    if input_token.is_some() && (input_username.is_some() || input_password.is_some()) {
+        return Err(MicrosandboxError::InvalidArgument(
+            "token cannot be combined with username/password".to_string(),
+        ));
+    }
+
+    if let Some(token) = input_token {
+        return Ok(ParsedCredentials::Present(MsbRegistryAuth::Token { token }));
+    }
+
+    match (input_username, input_password) {
+        (Some(username), Some(password)) => {
+            Ok(ParsedCredentials::Present(MsbRegistryAuth::Basic {
+                username,
+                password,
+            }))
+        }
+        (None, None) => Ok(ParsedCredentials::Missing),
+        _ => Ok(ParsedCredentials::Incomplete),
+    }
+}
+
+/// Resolve explicit registry credentials from user-provided inputs only.
+///
+/// This function does not read environment variables nor stored credentials.
+pub fn resolve_explicit_credentials(
+    username: Option<String>,
+    password: Option<String>,
+    token: Option<String>,
+) -> MicrosandboxResult<MsbRegistryAuth> {
+    match parse_credential_inputs(username, password, token)? {
+        ParsedCredentials::Present(credentials) => Ok(credentials),
+        ParsedCredentials::Missing => Err(MicrosandboxError::InvalidArgument(
+            "no credentials provided; explicitly pass --token or --username with --password-stdin"
+                .to_string(),
+        )),
+        ParsedCredentials::Incomplete => Err(MicrosandboxError::InvalidArgument(
+            "both username and password are required".to_string(),
+        )),
+    }
+}
+
 /// Registry is an abstraction over the logic for fetching images from a registry,
 /// and storing them in a local cache.
 ///
 /// For fetching image, it uses `oci_client` crate which implements the [OCI Distribution Spec].
 ///
 /// [OCI Distribution Spec]: https://distribution.github.io/distribution/spec/manifest-v2-2/#image-manifest-version-2-schema-2
-pub struct Registry<C: GlobalCacheOps> {
+pub struct Registry<C: GlobalCacheOps, S: RegistryCredentialStoreOps = CredentialStore> {
     client: OciClient,
-
-    /// TODO (333): Support varying auth methods.
-    auth: RegistryAuth,
 
     /// The database where image configurations, and manifests are stored.
     db: Pool<Sqlite>,
 
     /// Abstraction for interacting with the global microsandbox cache.
     global_cache: C,
+
+    /// Abstraction for interacting with the global credential_store
+    credential_store: S,
 }
 
-impl<O> Registry<O>
+impl<O, S> Registry<O, S>
 where
     O: GlobalCacheOps + Send + Sync,
+    S: RegistryCredentialStoreOps,
 {
     /// Creates a new Docker Registry client with the specified image download path and OCI database path.
     ///
@@ -76,10 +142,12 @@ where
     /// * `db` - The database where image configurations, and manifests are stored
     /// * `platform` - The platform for which the image is being downloaded
     /// * `global_cache` - The global layer cache
+    /// * `credential_store` - The global credential store
     pub async fn new(
         db: Pool<Sqlite>,
         platform: Platform,
         global_cache: O,
+        credential_store: S,
     ) -> MicrosandboxResult<Self> {
         let config = OciClientConfig {
             platform_resolver: Some(Box::new(move |manifests| {
@@ -90,10 +158,50 @@ where
 
         Ok(Self {
             client: OciClient::new(config),
-            auth: RegistryAuth::Anonymous,
             db,
             global_cache,
+            credential_store,
         })
+    }
+
+    /// Resolve registry auth for a given reference.
+    ///
+    /// Priority:
+    /// 1) Environment variables
+    /// 2) Stored credentials (msb login)
+    /// 3) Anonymous
+    pub(crate) fn resolve_auth_with_store(
+        reference: &Reference,
+        credential_store: &S,
+    ) -> MicrosandboxResult<RegistryAuth> {
+        // TODO: If Bearer auth fails during registry interaction, retry with Basic auth
+        // for registries like GHCR that may require username/password fallback.
+        let registry = reference.resolve_registry().to_string();
+
+        match parse_credential_inputs(
+            env::get_registry_username(),
+            env::get_registry_password(),
+            env::get_registry_token(),
+        )? {
+            ParsedCredentials::Present(credentials) => return Ok(credentials.into()),
+            ParsedCredentials::Incomplete => {
+                tracing::warn!(
+                    "registry credentials provided via env are incomplete; falling back to stored or anonymous"
+                );
+            }
+            ParsedCredentials::Missing => {}
+        }
+
+        if let Some(stored) = credential_store.load_registry_credentials(&registry)? {
+            return Ok(stored.into());
+        }
+
+        Ok(RegistryAuth::Anonymous)
+    }
+
+    /// Wrapper for allowing to test this behavior without complicated mocks
+    pub fn resolve_auth(&self, reference: &Reference) -> MicrosandboxResult<RegistryAuth> {
+        Self::resolve_auth_with_store(reference, &self.credential_store)
     }
 
     /// Returns the global layer cache.
@@ -258,13 +366,17 @@ where
             tracing::info!(?reference, "Image was already extracted");
             return Ok(());
         }
+        let auth = self.resolve_auth(reference)?;
+        self.client
+            .store_auth_if_needed(reference.resolve_registry(), &auth)
+            .await;
 
         // Calculate total size and save image record
         #[cfg(feature = "cli")]
         let fetch_details_sp =
             term::create_spinner(FETCH_IMAGE_DETAILS_MSG.to_string(), None, None);
 
-        let index = self.fetch_index(reference).await?;
+        let index = self.fetch_index(reference, &auth).await?;
         let size = match index {
             OciManifest::Image(m) => m.config.size,
             OciManifest::ImageIndex(m) => m.manifests.iter().map(|m| m.size).sum(),
@@ -272,7 +384,7 @@ where
         let image_id = db::save_or_update_image(&self.db, &reference.as_db_key(), size).await?;
 
         // Fetch and save manifest
-        let (manifest, config) = self.fetch_manifest_and_config(reference).await?;
+        let (manifest, config) = self.fetch_manifest_and_config(reference, &auth).await?;
         let manifest_id = db::save_manifest(&self.db, image_id, &manifest).await?;
         db::save_config(&self.db, manifest_id, &config).await?;
 
@@ -336,8 +448,9 @@ where
     pub(crate) async fn fetch_index(
         &self,
         reference: &Reference,
+        auth: &RegistryAuth,
     ) -> MicrosandboxResult<OciManifest> {
-        let (index, _) = self.client.pull_manifest(reference, &self.auth).await?;
+        let (index, _) = self.client.pull_manifest(reference, auth).await?;
         Ok(index)
     }
 
@@ -349,10 +462,11 @@ where
     pub(crate) async fn fetch_manifest_and_config(
         &self,
         reference: &Reference,
+        auth: &RegistryAuth,
     ) -> MicrosandboxResult<(OciImageManifest, OciConfigFile)> {
         let (manifest, _, config) = self
             .client
-            .pull_manifest_and_config(reference, &self.auth)
+            .pull_manifest_and_config(reference, auth)
             .await?;
 
         let config = OciConfig::oci_v1(config.as_bytes().to_vec(), manifest.annotations.clone());
@@ -401,5 +515,280 @@ where
         };
 
         Ok(stream.stream.map(|r| r.map_err(Into::into)).boxed())
+    }
+}
+
+//--------------------------------------------------------------------------------------------------
+// Tests
+//--------------------------------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::{collections::HashMap, sync::Mutex};
+
+    use crate::oci::GlobalCache;
+    use microsandbox_utils::{CredentialStore, MsbRegistryAuth};
+    use tempfile::TempDir;
+
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
+
+    struct MockCredentialStore;
+
+    impl RegistryCredentialStoreOps for MockCredentialStore {
+        fn load_registry_credentials(
+            &self,
+            host: &str,
+        ) -> MicrosandboxResult<Option<MsbRegistryAuth>> {
+            let entries = HashMap::from([(
+                "registry.test.invalid",
+                MsbRegistryAuth::Token {
+                    token: "mock-token".to_string(),
+                },
+            )]);
+            Ok(entries.get(host).cloned())
+        }
+    }
+
+    fn lock_env() -> std::sync::MutexGuard<'static, ()> {
+        ENV_LOCK.lock().unwrap_or_else(|err| err.into_inner())
+    }
+
+    fn keyring_roundtrip_available() -> bool {
+        let probe = MsbRegistryAuth::Token {
+            token: "probe-token".to_string(),
+        };
+        if CredentialStore::store_registry_credentials("registry.test.invalid", probe.clone())
+            .is_err()
+        {
+            return false;
+        }
+        match CredentialStore::load_registry_credentials("registry.test.invalid") {
+            Ok(Some(MsbRegistryAuth::Token { token })) => token == "probe-token",
+            _ => false,
+        }
+    }
+
+    struct EnvGuard {
+        key: &'static str,
+        prev: Option<std::ffi::OsString>,
+    }
+
+    impl EnvGuard {
+        fn set(key: &'static str, value: impl Into<std::ffi::OsString>) -> Self {
+            let prev = std::env::var_os(key);
+            let value: std::ffi::OsString = value.into();
+            unsafe { std::env::set_var(key, &value) };
+            Self { key, prev }
+        }
+
+        fn remove(key: &'static str) -> Self {
+            let prev = std::env::var_os(key);
+            unsafe { std::env::remove_var(key) };
+            Self { key, prev }
+        }
+    }
+
+    impl Drop for EnvGuard {
+        fn drop(&mut self) {
+            if let Some(value) = self.prev.take() {
+                unsafe { std::env::set_var(self.key, value) };
+            } else {
+                unsafe { std::env::remove_var(self.key) };
+            }
+        }
+    }
+
+    #[test]
+    fn resolve_explicit_credentials_prefers_token() {
+        let auth = resolve_explicit_credentials(None, None, Some("token-123".to_string())).unwrap();
+        assert!(matches!(
+            auth,
+            MsbRegistryAuth::Token { token } if token == "token-123"
+        ));
+    }
+
+    #[test]
+    fn resolve_explicit_credentials_accepts_basic() {
+        let auth =
+            resolve_explicit_credentials(Some("user".to_string()), Some("pass".to_string()), None)
+                .unwrap();
+        assert!(matches!(
+            auth,
+            MsbRegistryAuth::Basic { username, password }
+                if username == "user" && password == "pass"
+        ));
+    }
+
+    #[tokio::test]
+    async fn resolve_auth_prefers_env_token() {
+        let _lock = lock_env();
+        let _token = EnvGuard::set(env::MSB_REGISTRY_TOKEN_ENV_VAR, "env-token");
+        let _user = EnvGuard::remove(env::MSB_REGISTRY_USERNAME_ENV_VAR);
+        let _pass = EnvGuard::remove(env::MSB_REGISTRY_PASSWORD_ENV_VAR);
+
+        let msb_home = TempDir::new().expect("temp msb home");
+        let _msb_home = EnvGuard::set(env::MICROSANDBOX_HOME_ENV_VAR, msb_home.path());
+        let _ = CredentialStore::remove_registry_credentials("registry.test.invalid");
+        CredentialStore::store_registry_credentials(
+            "registry.test.invalid",
+            MsbRegistryAuth::Token {
+                token: "stored-token".to_string(),
+            },
+        )
+        .expect("store");
+
+        let reference: Reference = "registry.test.invalid/org/app:1.0".parse().unwrap();
+        let auth = Registry::<GlobalCache, CredentialStore>::resolve_auth_with_store(
+            &reference,
+            &CredentialStore,
+        )
+        .expect("resolve auth");
+        assert!(matches!(auth, RegistryAuth::Bearer(t) if t == "env-token"));
+    }
+
+    #[tokio::test]
+    async fn resolve_auth_prefers_env_basic() {
+        let _lock = lock_env();
+        let _token = EnvGuard::remove(env::MSB_REGISTRY_TOKEN_ENV_VAR);
+        let _user = EnvGuard::set(env::MSB_REGISTRY_USERNAME_ENV_VAR, "env-user");
+        let _pass = EnvGuard::set(env::MSB_REGISTRY_PASSWORD_ENV_VAR, "env-pass");
+
+        let msb_home = TempDir::new().expect("temp msb home");
+        let _msb_home = EnvGuard::set(env::MICROSANDBOX_HOME_ENV_VAR, msb_home.path());
+        let _ = CredentialStore::remove_registry_credentials("registry.test.invalid");
+        CredentialStore::store_registry_credentials(
+            "registry.test.invalid",
+            MsbRegistryAuth::Token {
+                token: "stored-token".to_string(),
+            },
+        )
+        .expect("store");
+
+        let reference: Reference = "registry.test.invalid/org/app:1.0".parse().unwrap();
+        let auth = Registry::<GlobalCache, CredentialStore>::resolve_auth_with_store(
+            &reference,
+            &CredentialStore,
+        )
+        .expect("resolve auth");
+        assert!(matches!(auth, RegistryAuth::Basic(u, p) if u == "env-user" && p == "env-pass"));
+    }
+
+    #[tokio::test]
+    async fn resolve_auth_uses_stored_credentials_when_env_missing() {
+        let _lock = lock_env();
+        let _token = EnvGuard::remove(env::MSB_REGISTRY_TOKEN_ENV_VAR);
+        let _user = EnvGuard::remove(env::MSB_REGISTRY_USERNAME_ENV_VAR);
+        let _pass = EnvGuard::remove(env::MSB_REGISTRY_PASSWORD_ENV_VAR);
+
+        let msb_home = TempDir::new().expect("temp msb home");
+        let _msb_home = EnvGuard::set(env::MICROSANDBOX_HOME_ENV_VAR, msb_home.path());
+        let _ = CredentialStore::remove_registry_credentials("registry.test.invalid");
+        if !keyring_roundtrip_available() {
+            eprintln!("skipping: keyring backend does not support roundtrip in this environment");
+            return;
+        }
+        CredentialStore::store_registry_credentials(
+            "registry.test.invalid",
+            MsbRegistryAuth::Token {
+                token: "stored-token".to_string(),
+            },
+        )
+        .expect("store");
+
+        let reference: Reference = "registry.test.invalid/org/app:1.0".parse().unwrap();
+        let auth = Registry::<GlobalCache, CredentialStore>::resolve_auth_with_store(
+            &reference,
+            &CredentialStore,
+        )
+        .expect("resolve auth");
+        assert!(matches!(auth, RegistryAuth::Bearer(t) if t == "stored-token"));
+    }
+
+    #[tokio::test]
+    async fn resolve_auth_falls_back_to_stored_when_env_is_incomplete() {
+        let _lock = lock_env();
+        let _token = EnvGuard::remove(env::MSB_REGISTRY_TOKEN_ENV_VAR);
+        let _user = EnvGuard::set(env::MSB_REGISTRY_USERNAME_ENV_VAR, "env-user");
+        let _pass = EnvGuard::remove(env::MSB_REGISTRY_PASSWORD_ENV_VAR);
+
+        let msb_home = TempDir::new().expect("temp msb home");
+        let _msb_home = EnvGuard::set(env::MICROSANDBOX_HOME_ENV_VAR, msb_home.path());
+        let _ = CredentialStore::remove_registry_credentials("registry.test.invalid");
+        if !keyring_roundtrip_available() {
+            eprintln!("skipping: keyring backend does not support roundtrip in this environment");
+            return;
+        }
+        CredentialStore::store_registry_credentials(
+            "registry.test.invalid",
+            MsbRegistryAuth::Token {
+                token: "stored-token".to_string(),
+            },
+        )
+        .expect("store");
+
+        let reference: Reference = "registry.test.invalid/org/app:1.0".parse().unwrap();
+        let auth = Registry::<GlobalCache, CredentialStore>::resolve_auth_with_store(
+            &reference,
+            &CredentialStore,
+        )
+        .expect("resolve auth");
+        assert!(matches!(auth, RegistryAuth::Bearer(t) if t == "stored-token"));
+    }
+
+    #[tokio::test]
+    async fn resolve_auth_returns_anonymous_when_missing() {
+        let _lock = lock_env();
+        let _token = EnvGuard::remove(env::MSB_REGISTRY_TOKEN_ENV_VAR);
+        let _user = EnvGuard::remove(env::MSB_REGISTRY_USERNAME_ENV_VAR);
+        let _pass = EnvGuard::remove(env::MSB_REGISTRY_PASSWORD_ENV_VAR);
+
+        let msb_home = TempDir::new().expect("temp msb home");
+        let _msb_home = EnvGuard::set(env::MICROSANDBOX_HOME_ENV_VAR, msb_home.path());
+        let _ = CredentialStore::remove_registry_credentials("registry.test.invalid");
+
+        let reference: Reference = "registry.test.invalid/org/app:1.0".parse().unwrap();
+        let auth = Registry::<GlobalCache, CredentialStore>::resolve_auth_with_store(
+            &reference,
+            &CredentialStore,
+        )
+        .expect("resolve auth");
+        assert!(matches!(auth, RegistryAuth::Anonymous));
+    }
+
+    #[tokio::test]
+    async fn resolve_auth_errors_on_token_and_basic() {
+        let _lock = lock_env();
+        let _token = EnvGuard::set(env::MSB_REGISTRY_TOKEN_ENV_VAR, "env-token");
+        let _user = EnvGuard::set(env::MSB_REGISTRY_USERNAME_ENV_VAR, "env-user");
+        let _pass = EnvGuard::set(env::MSB_REGISTRY_PASSWORD_ENV_VAR, "env-pass");
+
+        let msb_home = TempDir::new().expect("temp msb home");
+        let _msb_home = EnvGuard::set(env::MICROSANDBOX_HOME_ENV_VAR, msb_home.path());
+        let _ = CredentialStore::remove_registry_credentials("registry.test.invalid");
+
+        let reference: Reference = "registry.test.invalid/org/app:1.0".parse().unwrap();
+        let err = Registry::<GlobalCache, CredentialStore>::resolve_auth_with_store(
+            &reference,
+            &CredentialStore,
+        )
+        .expect_err("expected error");
+        assert!(matches!(err, crate::MicrosandboxError::InvalidArgument(_)));
+    }
+
+    #[tokio::test]
+    async fn resolve_auth_can_use_mock_credential_store() {
+        let _lock = lock_env();
+        let _token = EnvGuard::remove(env::MSB_REGISTRY_TOKEN_ENV_VAR);
+        let _user = EnvGuard::remove(env::MSB_REGISTRY_USERNAME_ENV_VAR);
+        let _pass = EnvGuard::remove(env::MSB_REGISTRY_PASSWORD_ENV_VAR);
+
+        let reference: Reference = "registry.test.invalid/org/app:1.0".parse().unwrap();
+        let auth = Registry::<GlobalCache, MockCredentialStore>::resolve_auth_with_store(
+            &reference,
+            &MockCredentialStore,
+        )
+        .expect("resolve auth");
+        assert!(matches!(auth, RegistryAuth::Bearer(t) if t == "mock-token"));
     }
 }

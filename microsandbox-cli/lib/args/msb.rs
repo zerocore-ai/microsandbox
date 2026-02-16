@@ -520,7 +520,29 @@ pub enum MicrosandboxSubcommand {
 
     /// Login to a registry
     #[command(name = "login")]
-    Login,
+    Login {
+        /// Registry host (defaults to OCI_REGISTRY_DOMAIN or docker.io)
+        registry: Option<String>,
+
+        /// Registry username
+        #[arg(short, long)]
+        username: Option<String>,
+
+        /// Read password from stdin
+        #[arg(long)]
+        password_stdin: bool,
+
+        /// Registry token
+        #[arg(long)]
+        token: Option<String>,
+    },
+
+    /// Logout from a registry
+    #[command(name = "logout")]
+    Logout {
+        /// Registry host (defaults to OCI_REGISTRY_DOMAIN or docker.io)
+        registry: Option<String>,
+    },
 
     /// Push image to a registry
     #[command(name = "push")]

@@ -1,3 +1,4 @@
+use microsandbox_utils::CredentialStore;
 use oci_spec::image::Platform;
 use sqlx::{Pool, Sqlite};
 
@@ -23,7 +24,7 @@ pub(crate) async fn mock_registry_and_db() -> (Registry<GlobalCache>, Pool<Sqlit
     let layer_ops = GlobalCache::new(layers_tar_dir, extracted_layers_dir, db.clone())
         .await
         .expect("global cache to be initialized");
-    let registry = Registry::new(db.clone(), platform, layer_ops)
+    let registry = Registry::<GlobalCache>::new(db.clone(), platform, layer_ops, CredentialStore)
         .await
         .unwrap();
     (registry, db, temp_dir)

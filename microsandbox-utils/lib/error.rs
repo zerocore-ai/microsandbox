@@ -37,6 +37,14 @@ pub enum MicrosandboxUtilsError {
     #[error("nix error: {0}")]
     NixError(#[from] nix::Error),
 
+    /// An error that occurred during a Serde JSON operation
+    #[error("serde json error: {0}")]
+    SerdeJson(#[from] serde_json::Error),
+
+    /// An error that occurred while accessing the secure credential store.
+    #[error("keyring error: {0}")]
+    Keyring(#[from] keyring::Error),
+
     /// Custom error.
     #[error("Custom error: {0}")]
     Custom(#[from] AnyError),

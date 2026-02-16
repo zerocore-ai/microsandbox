@@ -9,7 +9,7 @@ use crate::{
 };
 
 use futures::StreamExt;
-use oci_client::manifest::OciManifest;
+use oci_client::{manifest::OciManifest, secrets::RegistryAuth};
 use oci_spec::image::{Digest, DigestAlgorithm, Os};
 use sqlx::Row;
 use tokio::{fs, io::AsyncWriteExt, test};
@@ -89,8 +89,9 @@ async fn test_docker_pull_image() -> anyhow::Result<()> {
 async fn test_docker_fetch_index() -> anyhow::Result<()> {
     let (registry, _, _) = mock_registry_and_db().await;
     let reference = Reference::from_str("alpine:latest").unwrap();
+    let auth = RegistryAuth::Anonymous;
 
-    let result = registry.fetch_index(&reference).await;
+    let result = registry.fetch_index(&reference, &auth).await;
     let OciManifest::ImageIndex(index) = result.unwrap() else {
         panic!("alpine image should be image index");
     };
@@ -120,8 +121,9 @@ async fn test_docker_fetch_index() -> anyhow::Result<()> {
 async fn test_docker_fetch_manifest_and_config() -> anyhow::Result<()> {
     let (registry, _, _) = mock_registry_and_db().await;
     let reference = Reference::from_str("alpine:latest").unwrap();
+    let auth = RegistryAuth::Anonymous;
     let (manifest, config) = registry
-        .fetch_manifest_and_config(&reference)
+        .fetch_manifest_and_config(&reference, &auth)
         .await
         .unwrap();
 
@@ -165,9 +167,12 @@ async fn test_docker_fetch_manifest_and_config() -> anyhow::Result<()> {
 async fn test_docker_fetch_image_blob() -> anyhow::Result<()> {
     let (registry, _, _) = mock_registry_and_db().await;
     let reference = Reference::from_str("alpine:latest").unwrap();
+    let auth = RegistryAuth::Anonymous;
 
     // Get a layer digest from manifest
-    let (manifest, _) = registry.fetch_manifest_and_config(&reference).await?;
+    let (manifest, _) = registry
+        .fetch_manifest_and_config(&reference, &auth)
+        .await?;
     let layer = manifest.layers.first().unwrap();
     let digest = Digest::try_from(layer.digest.clone()).unwrap();
     let mut stream = registry

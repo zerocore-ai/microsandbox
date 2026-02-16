@@ -646,6 +646,15 @@ msb pull [--image] [--image-group] <name> [options]
 **Examples:**
 
 ```bash
+# Pull a private image using env credentials (token)
+export MSB_REGISTRY_TOKEN=token123
+msb pull registry.example.com/org/app:1.0
+
+# Pull a private image using env credentials (username/password)
+export MSB_REGISTRY_USERNAME=user
+export MSB_REGISTRY_PASSWORD=pass
+msb pull registry.example.com/org/app:1.0
+
 # Pull an image
 msb pull --image python:3.11
 
@@ -682,6 +691,60 @@ msb push --image myapp:latest
 
 # Push an image (--image is default)
 msb push myapp:latest
+```
+
+===
+
+==- `msb login`
+Set registry credentials (persisted in the system keyring).
+
+```bash
+msb login [registry] [--username <user>] [--password-stdin] [--token <token>]
+```
+
+| Option            | Description                        |
+| ----------------- | ---------------------------------- |
+| `--username`      | Registry username                  |
+| `--password-stdin`| Read password from stdin           |
+| `--token`         | Registry access token (bearer)     |
+
+**Examples:**
+
+```bash
+# Provide a token (bearer auth)
+msb login registry.example.com --token token123
+
+# Provide username and password via stdin
+echo "pass" | msb login docker.io --username user --password-stdin
+
+# GHCR: use basic auth (username + PAT) instead of bearer token
+echo "$GITHUB_PAT" | msb login ghcr.io --username "$GITHUB_USER" --password-stdin
+```
+
+!!!note
+For registries like `ghcr.io`, prefer basic auth (`--username` + `--password-stdin` with a GitHub PAT).
+Using `--token` sends bearer auth and may return `invalid token` on GHCR.
+!!!
+
+!!!warning Security
+Credentials are stored in the system keyring under service names like `microsandbox:<registry>`.
+Protect your local keychain/session and avoid exposing secrets in shell history.
+!!!
+
+===
+
+==- `msb logout`
+Remove stored registry credentials.
+
+```bash
+msb logout [registry]
+```
+
+**Examples:**
+
+```bash
+# Remove credentials for a registry
+msb logout ghcr.io
 ```
 
 ===
