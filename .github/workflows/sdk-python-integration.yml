@@ -9,7 +9,7 @@ on:
 jobs:
   python-sdk:
     name: Python SDK Smoke Tests
-    runs-on: self-hosted-Linux-x86
+    runs-on: self-hosted-linux-x64
 
     defaults:
       run:
