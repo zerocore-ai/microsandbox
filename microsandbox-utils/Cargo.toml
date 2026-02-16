@@ -32,5 +32,13 @@ tokio.workspace = true
 tracing.workspace = true
 typed-path.workspace = true
 
+[target.'cfg(target_os = "macos")'.dependencies]
+keyring = { workspace = true, features = ["apple-native"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+keyring = { workspace = true, features = ["linux-native"] }
+
+#TODO add windows feature if needed
+
 [dev-dependencies]
 tempfile.workspace = true
